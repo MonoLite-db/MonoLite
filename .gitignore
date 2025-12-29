@@ -1,0 +1,15 @@
+.DS_Store
+
+# IDE / tools
+.cursor/
+.cache/
+
+# Go build artifacts
+*.test
+
+# Coverage artifacts
+coverage*.out
+coverage*.html
+coverage*.txt
+coverage_*.txt
+
