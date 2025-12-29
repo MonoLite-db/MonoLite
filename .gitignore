@@ -13,3 +13,6 @@ coverage*.html
 coverage*.txt
 coverage_*.txt
 
+# Local test logs
+test-output*.txt
+

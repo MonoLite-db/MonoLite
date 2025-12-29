@@ -1178,19 +1178,46 @@ func (db *Database) deleteCommand(cmd bson.D) (bson.D, error) {
 		}
 
 		var filter bson.D
+		var limit int64 // 1=deleteOne, 0=deleteMany (MongoDB delete command semantics)
 		for _, elem := range deleteDoc {
 			if elem.Key == "q" {
 				filter, _ = elem.Value.(bson.D)
+			}
+			if elem.Key == "limit" {
+				switch v := elem.Value.(type) {
+				case int:
+					limit = int64(v)
+				case int32:
+					limit = int64(v)
+				case int64:
+					limit = v
+				case float64:
+					limit = int64(v)
+				default:
+					// ignore unsupported types; default 0
+				}
 			}
 		}
 
 		// 如果在事务中，先获取要删除的文档用于 undo
 		var docsToDelete []bson.D
 		if cmdCtx != nil && cmdCtx.IsInTransaction() {
-			docsToDelete, _ = col.Find(filter)
+			if limit == 1 {
+				if d, _ := col.FindOne(filter); d != nil {
+					docsToDelete = []bson.D{d}
+				}
+			} else {
+				docsToDelete, _ = col.Find(filter)
+			}
 		}
 
-		deleted, err := col.Delete(filter)
+		var deleted int64
+		var err error
+		if limit == 1 {
+			deleted, err = col.DeleteOne(filter)
+		} else {
+			deleted, err = col.Delete(filter)
+		}
 		if err != nil {
 			return ErrorResponse(err), nil
 		}

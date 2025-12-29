@@ -8,6 +8,8 @@ MonoDB is a **single-file, embeddable document database** compatible with MongoD
 ![MongoDB Compatible](https://img.shields.io/badge/MongoDB-Wire%20Protocol-47A248?style=flat&logo=mongodb)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=flat)
 
+**[Docs (EN)](docs/COMPATIBILITY.md)** · **[文档 (中文)](docs/COMPATIBILITY_CN.md)** · **[README (EN)](README.md)** · **[README (中文)](README_CN.md)** · **[Issues](https://github.com/monolite/monodb/issues)** · **[Contributing](CONTRIBUTING.md)**
+
 </div>
 
 ## Project Vision
@@ -228,7 +230,9 @@ db.users.stats()
 - ❌ Full-Text Search
 - ❌ GridFS
 
-> For complete compatibility details, see [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)
+> For complete compatibility details, see:
+> - English: [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)
+> - 中文: [docs/COMPATIBILITY_CN.md](docs/COMPATIBILITY_CN.md)
 
 ## Data Migration
 
@@ -373,7 +377,8 @@ monodb/
 │   ├── wal.go            # Write-Ahead Log
 │   └── keystring.go      # Index key encoding (MongoDB KeyString)
 ├── docs/                 # Documentation
-│   └── COMPATIBILITY.md  # Compatibility details
+│   ├── COMPATIBILITY.md     # Compatibility details (English)
+│   └── COMPATIBILITY_CN.md  # 兼容性详情（中文）
 ├── CLAUDE.md             # Project rules
 ├── go.mod
 └── README.md
@@ -434,9 +439,7 @@ MIT License
 
 <div align="center">
 
-**[Documentation](docs/COMPATIBILITY.md)** · **[Issues](https://github.com/monolite/monodb/issues)** · **[Contributing](CONTRIBUTING.md)**
-
-[中文文档](README_CN.md)
+**[Docs (EN)](docs/COMPATIBILITY.md)** · **[文档 (中文)](docs/COMPATIBILITY_CN.md)** · **[README (EN)](README.md)** · **[README (中文)](README_CN.md)** · **[Issues](https://github.com/monolite/monodb/issues)** · **[Contributing](CONTRIBUTING.md)**
 
 </div>
 

@@ -8,6 +8,8 @@ MonoDB 是一个**单文件、可嵌入的文档数据库**，兼容 MongoDB Wir
 ![MongoDB Compatible](https://img.shields.io/badge/MongoDB-Wire%20Protocol-47A248?style=flat&logo=mongodb)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=flat)
 
+**[文档 (中文)](docs/COMPATIBILITY_CN.md)** · **[Docs (EN)](docs/COMPATIBILITY.md)** · **[README (中文)](README_CN.md)** · **[README (EN)](README.md)** · **[问题反馈](https://github.com/monolite/monodb/issues)** · **[贡献指南](CONTRIBUTING.md)**
+
 </div>
 
 ## 项目定位
@@ -228,7 +230,9 @@ db.users.stats()
 - ❌ 全文搜索
 - ❌ GridFS
 
-> 完整兼容性列表请参阅 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)
+> 完整兼容性列表请参阅：
+> - 中文： [docs/COMPATIBILITY_CN.md](docs/COMPATIBILITY_CN.md)
+> - English: [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)
 
 ## 数据迁移
 
@@ -372,7 +376,8 @@ monodb/
 │   ├── wal.go            # Write-Ahead Log
 │   └── keystring.go      # 索引键编码（MongoDB KeyString）
 ├── docs/                 # 文档
-│   └── COMPATIBILITY.md  # 兼容性详情
+│   ├── COMPATIBILITY.md     # Compatibility details (English)
+│   └── COMPATIBILITY_CN.md  # 兼容性详情（中文）
 ├── CLAUDE.md             # 项目规则
 ├── go.mod
 └── README.md
@@ -433,6 +438,6 @@ MIT License
 
 <div align="center">
 
-**[文档](docs/COMPATIBILITY.md)** · **[问题反馈](https://github.com/monolite/monodb/issues)** · **[贡献指南](CONTRIBUTING.md)**
+**[文档 (中文)](docs/COMPATIBILITY_CN.md)** · **[Docs (EN)](docs/COMPATIBILITY.md)** · **[README (中文)](README_CN.md)** · **[README (EN)](README.md)** · **[问题反馈](https://github.com/monolite/monodb/issues)** · **[贡献指南](CONTRIBUTING.md)**
 
 </div>
