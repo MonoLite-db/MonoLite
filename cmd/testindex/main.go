@@ -15,6 +15,7 @@ import (
 
 func main() {
 	// 连接到 MonoDB
+	// EN: Connect to MonoDB.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -29,6 +30,7 @@ func main() {
 	defer client.Disconnect(ctx)
 
 	// Ping 测试
+	// EN: Ping test.
 	if err := client.Ping(ctx, nil); err != nil {
 		log.Fatalf("Ping failed: %v", err)
 	}
@@ -38,9 +40,11 @@ func main() {
 	products := db.Collection("products")
 
 	// 清理
+	// EN: Cleanup.
 	products.Drop(ctx)
 
 	// 插入测试数据
+	// EN: Insert test data.
 	fmt.Println("\n=== Inserting Test Data ===")
 	docs := []interface{}{
 		bson.D{{Key: "name", Value: "iPhone"}, {Key: "price", Value: 999}, {Key: "category", Value: "electronics"}},
@@ -57,6 +61,7 @@ func main() {
 	fmt.Printf("Inserted %d documents\n", len(result.InsertedIDs))
 
 	// 测试比较运算符 $gt
+	// EN: Test comparison operator $gt.
 	fmt.Println("\n=== Test $gt: price > 500 ===")
 	cursor, err := products.Find(ctx, bson.D{{Key: "price", Value: bson.D{{Key: "$gt", Value: 500}}}})
 	if err != nil {
@@ -72,6 +77,7 @@ func main() {
 	}
 
 	// 测试 $in 运算符
+	// EN: Test $in operator.
 	fmt.Println("\n=== Test $in: price in [199, 999] ===")
 	cursor, err = products.Find(ctx, bson.D{{Key: "price", Value: bson.D{{Key: "$in", Value: bson.A{199, 999}}}}})
 	if err != nil {
@@ -87,6 +93,7 @@ func main() {
 	}
 
 	// 测试排序
+	// EN: Test sorting.
 	fmt.Println("\n=== Test Sort: price descending ===")
 	findOpts := options.Find().SetSort(bson.D{{Key: "price", Value: -1}})
 	cursor, err = products.Find(ctx, bson.D{}, findOpts)
@@ -103,6 +110,7 @@ func main() {
 	}
 
 	// 测试 Limit
+	// EN: Test Limit.
 	fmt.Println("\n=== Test Limit: top 3 ===")
 	findOpts = options.Find().SetSort(bson.D{{Key: "price", Value: -1}}).SetLimit(3)
 	cursor, err = products.Find(ctx, bson.D{}, findOpts)
@@ -119,6 +127,7 @@ func main() {
 	}
 
 	// 测试 Skip
+	// EN: Test Skip.
 	fmt.Println("\n=== Test Skip: skip 2, limit 2 ===")
 	findOpts = options.Find().SetSort(bson.D{{Key: "price", Value: -1}}).SetSkip(2).SetLimit(2)
 	cursor, err = products.Find(ctx, bson.D{}, findOpts)
@@ -135,6 +144,7 @@ func main() {
 	}
 
 	// 测试 Projection
+	// EN: Test Projection.
 	fmt.Println("\n=== Test Projection: only name ===")
 	findOpts = options.Find().SetProjection(bson.D{{Key: "name", Value: 1}, {Key: "_id", Value: 0}})
 	cursor, err = products.Find(ctx, bson.D{}, findOpts)
@@ -151,6 +161,7 @@ func main() {
 	}
 
 	// 测试组合查询
+	// EN: Test a combined query.
 	fmt.Println("\n=== Test Combined: electronics, price > 500, sorted, limited ===")
 	findOpts = options.Find().
 		SetSort(bson.D{{Key: "price", Value: 1}}).
@@ -173,6 +184,7 @@ func main() {
 	}
 
 	// 测试创建索引
+	// EN: Test CreateIndex.
 	fmt.Println("\n=== Test CreateIndex ===")
 	indexModel := mongo.IndexModel{
 		Keys:    bson.D{{Key: "price", Value: 1}},
@@ -186,6 +198,7 @@ func main() {
 	}
 
 	// 测试列出索引
+	// EN: Test ListIndexes.
 	fmt.Println("\n=== Test ListIndexes ===")
 	indexCursor, err := products.Indexes().List(ctx)
 	if err != nil {

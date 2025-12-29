@@ -10,16 +10,19 @@ import (
 
 func TestWALBasic(t *testing.T) {
 	// 创建临时目录
+	// EN: Create a temporary directory.
 	tmpDir := t.TempDir()
 	walPath := filepath.Join(tmpDir, "test.wal")
 
 	// 创建新 WAL
+	// EN: Create a new WAL.
 	wal, err := NewWAL(walPath)
 	if err != nil {
 		t.Fatalf("Failed to create WAL: %v", err)
 	}
 
 	// 写入几条记录
+	// EN: Write a few records.
 	testData := []byte("test page data")
 	paddedData := make([]byte, PageSize)
 	copy(paddedData, testData)
@@ -49,16 +52,19 @@ func TestWALBasic(t *testing.T) {
 	}
 
 	// 同步
+	// EN: Sync.
 	if err := wal.Sync(); err != nil {
 		t.Fatalf("Failed to sync WAL: %v", err)
 	}
 
 	// 关闭
+	// EN: Close.
 	if err := wal.Close(); err != nil {
 		t.Fatalf("Failed to close WAL: %v", err)
 	}
 
 	// 重新打开 WAL
+	// EN: Reopen WAL.
 	wal2, err := NewWAL(walPath)
 	if err != nil {
 		t.Fatalf("Failed to reopen WAL: %v", err)
@@ -66,12 +72,14 @@ func TestWALBasic(t *testing.T) {
 	defer wal2.Close()
 
 	// 验证 LSN 恢复
+	// EN: Verify LSN recovery.
 	currentLSN := wal2.GetCurrentLSN()
 	if currentLSN != 4 {
 		t.Errorf("Expected current LSN 4, got %d", currentLSN)
 	}
 
 	// 读取记录
+	// EN: Read records.
 	records, err := wal2.ReadRecordsFrom(1)
 	if err != nil {
 		t.Fatalf("Failed to read records: %v", err)
@@ -82,6 +90,7 @@ func TestWALBasic(t *testing.T) {
 	}
 
 	// 验证记录内容
+	// EN: Verify record contents.
 	if records[0].Type != WALRecordPageWrite {
 		t.Errorf("Expected PageWrite record, got %d", records[0].Type)
 	}
@@ -114,6 +123,7 @@ func TestWALCheckpoint(t *testing.T) {
 	}
 
 	// 写入一些记录
+	// EN: Write some records.
 	for i := 0; i < 5; i++ {
 		_, err := wal.WriteAllocRecord(PageId(i), PageTypeData)
 		if err != nil {
@@ -122,17 +132,20 @@ func TestWALCheckpoint(t *testing.T) {
 	}
 
 	// 创建检查点
+	// EN: Create a checkpoint.
 	checkpointLSN := wal.GetCurrentLSN() - 1
 	if err := wal.Checkpoint(checkpointLSN); err != nil {
 		t.Fatalf("Failed to create checkpoint: %v", err)
 	}
 
 	// 验证检查点 LSN
+	// EN: Verify checkpoint LSN.
 	if wal.GetCheckpointLSN() != checkpointLSN {
 		t.Errorf("Expected checkpoint LSN %d, got %d", checkpointLSN, wal.GetCheckpointLSN())
 	}
 
 	// 关闭并重新打开
+	// EN: Close and reopen.
 	wal.Close()
 
 	wal2, err := NewWAL(walPath)
@@ -142,6 +155,7 @@ func TestWALCheckpoint(t *testing.T) {
 	defer wal2.Close()
 
 	// 验证检查点 LSN 持久化
+	// EN: Verify checkpoint LSN persisted.
 	if wal2.GetCheckpointLSN() != checkpointLSN {
 		t.Errorf("Expected checkpoint LSN %d after reopen, got %d", checkpointLSN, wal2.GetCheckpointLSN())
 	}
@@ -157,6 +171,7 @@ func TestWALTruncate(t *testing.T) {
 	}
 
 	// 写入一些记录
+	// EN: Write some records.
 	for i := 0; i < 10; i++ {
 		_, err := wal.WriteAllocRecord(PageId(i), PageTypeData)
 		if err != nil {
@@ -165,15 +180,18 @@ func TestWALTruncate(t *testing.T) {
 	}
 
 	// 获取文件大小
+	// EN: Get file size.
 	fi, _ := os.Stat(walPath)
 	sizeBefore := fi.Size()
 
 	// 截断
+	// EN: Truncate.
 	if err := wal.Truncate(); err != nil {
 		t.Fatalf("Failed to truncate WAL: %v", err)
 	}
 
 	// 验证文件大小减小
+	// EN: Verify file size decreased.
 	fi, _ = os.Stat(walPath)
 	sizeAfter := fi.Size()
 
@@ -193,12 +211,14 @@ func TestWALRecovery(t *testing.T) {
 	dbPath := filepath.Join(tmpDir, "test.db")
 
 	// 创建数据库并写入一些数据
+	// EN: Create a database and write some data.
 	pager, err := OpenPager(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to open pager: %v", err)
 	}
 
 	// 分配几个页面并写入数据
+	// EN: Allocate a few pages and write data.
 	page1, err := pager.AllocatePage(PageTypeData)
 	if err != nil {
 		t.Fatalf("Failed to allocate page: %v", err)
@@ -216,16 +236,19 @@ func TestWALRecovery(t *testing.T) {
 	pager.MarkDirty(page2.ID())
 
 	// Flush 以触发 WAL 写入和检查点
+	// EN: Flush to trigger WAL writes and checkpoint.
 	if err := pager.Flush(); err != nil {
 		t.Fatalf("Failed to flush: %v", err)
 	}
 
 	// 正常关闭
+	// EN: Close normally.
 	if err := pager.Close(); err != nil {
 		t.Fatalf("Failed to close pager: %v", err)
 	}
 
 	// 重新打开（模拟重启）
+	// EN: Reopen (simulate restart).
 	pager2, err := OpenPager(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to reopen pager: %v", err)
@@ -233,6 +256,7 @@ func TestWALRecovery(t *testing.T) {
 	defer pager2.Close()
 
 	// 验证数据仍然存在
+	// EN: Verify data still exists.
 	readPage1, err := pager2.ReadPage(page1.ID())
 	if err != nil {
 		t.Fatalf("Failed to read page 1: %v", err)
@@ -244,6 +268,7 @@ func TestWALRecovery(t *testing.T) {
 	}
 
 	// 验证数据内容
+	// EN: Verify data contents.
 	data1 := readPage1.Data()
 	for i, b := range testData1 {
 		if data1[i] != b {
@@ -264,12 +289,14 @@ func TestPagerWithoutWAL(t *testing.T) {
 	dbPath := filepath.Join(tmpDir, "test_no_wal.db")
 
 	// 创建不带 WAL 的 pager
+	// EN: Create a pager without WAL.
 	pager, err := OpenPagerWithWAL(dbPath, false)
 	if err != nil {
 		t.Fatalf("Failed to open pager without WAL: %v", err)
 	}
 
 	// 分配页面
+	// EN: Allocate a page.
 	page, err := pager.AllocatePage(PageTypeData)
 	if err != nil {
 		t.Fatalf("Failed to allocate page: %v", err)
@@ -285,6 +312,7 @@ func TestPagerWithoutWAL(t *testing.T) {
 	}
 
 	// 验证没有创建 WAL 文件
+	// EN: Verify no WAL file was created.
 	walPath := WALPath(dbPath)
 	if _, err := os.Stat(walPath); !os.IsNotExist(err) {
 		t.Error("WAL file should not exist when WAL is disabled")
@@ -292,4 +320,3 @@ func TestPagerWithoutWAL(t *testing.T) {
 
 	pager.Close()
 }
-

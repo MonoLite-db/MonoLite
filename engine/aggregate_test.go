@@ -10,6 +10,7 @@ import (
 )
 
 // 创建测试数据库
+// EN: Create a test database.
 func setupTestDB(t *testing.T) (*Database, func()) {
 	tmpFile, err := os.CreateTemp("", "monodb_test_*.db")
 	if err != nil {
@@ -18,6 +19,7 @@ func setupTestDB(t *testing.T) (*Database, func()) {
 	tmpPath := tmpFile.Name()
 	tmpFile.Close()
 	// 删除文件，让 OpenDatabase 创建新数据库
+	// EN: Remove the file so OpenDatabase creates a new database.
 	os.Remove(tmpPath)
 
 	db, err := OpenDatabase(tmpPath)
@@ -35,6 +37,7 @@ func setupTestDB(t *testing.T) (*Database, func()) {
 }
 
 // 插入测试数据
+// EN: Insert test data.
 func insertTestData(t *testing.T, col *Collection) {
 	docs := []bson.D{
 		{{Key: "name", Value: "Alice"}, {Key: "age", Value: int32(25)}, {Key: "city", Value: "Beijing"}, {Key: "score", Value: int32(85)}},
@@ -60,6 +63,7 @@ func TestMatchStage(t *testing.T) {
 	insertTestData(t, col)
 
 	// 测试简单匹配
+	// EN: Test a simple match.
 	pipeline := []bson.D{
 		{{Key: "$match", Value: bson.D{{Key: "city", Value: "Beijing"}}}},
 	}
@@ -74,6 +78,7 @@ func TestMatchStage(t *testing.T) {
 	}
 
 	// 验证结果中的 city 都是 Beijing
+	// EN: Verify all results have city=Beijing.
 	for _, doc := range results {
 		city := getDocField(doc, "city")
 		if city != "Beijing" {
@@ -90,6 +95,7 @@ func TestMatchStageWithOperators(t *testing.T) {
 	insertTestData(t, col)
 
 	// 测试比较运算符
+	// EN: Test comparison operators.
 	pipeline := []bson.D{
 		{{Key: "$match", Value: bson.D{{Key: "age", Value: bson.D{{Key: "$gte", Value: int32(30)}}}}}},
 	}
@@ -112,6 +118,7 @@ func TestProjectStage(t *testing.T) {
 	insertTestData(t, col)
 
 	// 测试字段包含
+	// EN: Test field inclusion.
 	pipeline := []bson.D{
 		{{Key: "$project", Value: bson.D{{Key: "name", Value: int32(1)}, {Key: "city", Value: int32(1)}, {Key: "_id", Value: int32(0)}}}},
 	}
@@ -126,6 +133,7 @@ func TestProjectStage(t *testing.T) {
 	}
 
 	// 验证只包含 name 和 city 字段
+	// EN: Verify only name and city fields are present.
 	for _, doc := range results {
 		if getDocField(doc, "age") != nil {
 			t.Error("不应该包含 age 字段")
@@ -150,6 +158,7 @@ func TestSortStage(t *testing.T) {
 	insertTestData(t, col)
 
 	// 测试升序排序
+	// EN: Test ascending sort.
 	pipeline := []bson.D{
 		{{Key: "$sort", Value: bson.D{{Key: "age", Value: int32(1)}}}},
 	}
@@ -160,6 +169,7 @@ func TestSortStage(t *testing.T) {
 	}
 
 	// 验证按 age 升序排列
+	// EN: Verify results are sorted by age ascending.
 	prevAge := int32(0)
 	for _, doc := range results {
 		age := getDocField(doc, "age").(int32)
@@ -170,6 +180,7 @@ func TestSortStage(t *testing.T) {
 	}
 
 	// 测试降序排序
+	// EN: Test descending sort.
 	pipeline = []bson.D{
 		{{Key: "$sort", Value: bson.D{{Key: "score", Value: int32(-1)}}}},
 	}
@@ -180,6 +191,7 @@ func TestSortStage(t *testing.T) {
 	}
 
 	// 验证按 score 降序排列
+	// EN: Verify results are sorted by score descending.
 	prevScore := int32(100)
 	for _, doc := range results {
 		score := getDocField(doc, "score").(int32)
@@ -240,6 +252,7 @@ func TestGroupStageSum(t *testing.T) {
 	insertTestData(t, col)
 
 	// 按城市分组，计算总分
+	// EN: Group by city and compute total score.
 	pipeline := []bson.D{
 		{{Key: "$group", Value: bson.D{
 			{Key: "_id", Value: "$city"},
@@ -257,6 +270,7 @@ func TestGroupStageSum(t *testing.T) {
 	}
 
 	// 验证分组结果
+	// EN: Verify grouping results.
 	for _, doc := range results {
 		city := getDocField(doc, "_id")
 		total := getDocField(doc, "totalScore").(float64)
@@ -289,6 +303,7 @@ func TestGroupStageAvg(t *testing.T) {
 	insertTestData(t, col)
 
 	// 按城市分组，计算平均年龄
+	// EN: Group by city and compute average age.
 	pipeline := []bson.D{
 		{{Key: "$group", Value: bson.D{
 			{Key: "_id", Value: "$city"},
@@ -328,6 +343,7 @@ func TestGroupStageMinMax(t *testing.T) {
 	insertTestData(t, col)
 
 	// 按城市分组，找最高分和最低分
+	// EN: Group by city and find max/min score.
 	pipeline := []bson.D{
 		{{Key: "$group", Value: bson.D{
 			{Key: "_id", Value: "$city"},
@@ -365,6 +381,7 @@ func TestGroupStageCount(t *testing.T) {
 	insertTestData(t, col)
 
 	// 按城市分组，统计人数
+	// EN: Group by city and count documents.
 	pipeline := []bson.D{
 		{{Key: "$group", Value: bson.D{
 			{Key: "_id", Value: "$city"},
@@ -406,6 +423,7 @@ func TestGroupStagePush(t *testing.T) {
 	insertTestData(t, col)
 
 	// 按城市分组，收集所有姓名
+	// EN: Group by city and collect all names.
 	pipeline := []bson.D{
 		{{Key: "$group", Value: bson.D{
 			{Key: "_id", Value: "$city"},
@@ -437,6 +455,7 @@ func TestGroupStageAddToSet(t *testing.T) {
 	col, _ := db.Collection("test")
 
 	// 插入包含重复年龄的数据
+	// EN: Insert data with duplicate ages.
 	docs := []bson.D{
 		{{Key: "name", Value: "A"}, {Key: "category", Value: "X"}, {Key: "value", Value: int32(1)}},
 		{{Key: "name", Value: "B"}, {Key: "category", Value: "X"}, {Key: "value", Value: int32(1)}},
@@ -448,6 +467,7 @@ func TestGroupStageAddToSet(t *testing.T) {
 	}
 
 	// 按 category 分组，收集唯一的 value
+	// EN: Group by category and collect unique values.
 	pipeline := []bson.D{
 		{{Key: "$group", Value: bson.D{
 			{Key: "_id", Value: "$category"},
@@ -504,6 +524,7 @@ func TestUnwindStage(t *testing.T) {
 	col, _ := db.Collection("test")
 
 	// 插入包含数组的文档
+	// EN: Insert documents containing arrays.
 	docs := []bson.D{
 		{{Key: "name", Value: "Doc1"}, {Key: "tags", Value: bson.A{"a", "b", "c"}}},
 		{{Key: "name", Value: "Doc2"}, {Key: "tags", Value: bson.A{"x", "y"}}},
@@ -523,11 +544,13 @@ func TestUnwindStage(t *testing.T) {
 	}
 
 	// Doc1 有 3 个 tag，Doc2 有 2 个 tag，共 5 条
+	// EN: Doc1 has 3 tags, Doc2 has 2 tags, total 5.
 	if len(results) != 5 {
 		t.Errorf("期望 5 条结果，实际 %d 条", len(results))
 	}
 
 	// 验证展开后 tags 是单个值而非数组
+	// EN: Verify after unwind, tags is a single value (not an array).
 	for _, doc := range results {
 		tags := getDocField(doc, "tags")
 		if _, ok := tags.(bson.A); ok {
@@ -543,6 +566,7 @@ func TestUnwindStageWithPreserve(t *testing.T) {
 	col, _ := db.Collection("test")
 
 	// 插入一些文档，包括空数组和无该字段的文档
+	// EN: Insert documents including empty arrays and documents without the field.
 	docs := []bson.D{
 		{{Key: "name", Value: "HasTags"}, {Key: "tags", Value: bson.A{"a", "b"}}},
 		{{Key: "name", Value: "EmptyTags"}, {Key: "tags", Value: bson.A{}}},
@@ -554,6 +578,7 @@ func TestUnwindStageWithPreserve(t *testing.T) {
 	}
 
 	// 不保留空数组
+	// EN: Do not preserve empty arrays.
 	pipeline := []bson.D{
 		{{Key: "$unwind", Value: "$tags"}},
 	}
@@ -568,6 +593,7 @@ func TestUnwindStageWithPreserve(t *testing.T) {
 	}
 
 	// 保留空数组
+	// EN: Preserve empty arrays.
 	pipeline = []bson.D{
 		{{Key: "$unwind", Value: bson.D{
 			{Key: "path", Value: "$tags"},
@@ -626,6 +652,7 @@ func TestComplexPipeline(t *testing.T) {
 	insertTestData(t, col)
 
 	// 复杂管道：筛选 -> 分组 -> 排序 -> 限制
+	// EN: Complex pipeline: match -> group -> sort -> limit.
 	pipeline := []bson.D{
 		{{Key: "$match", Value: bson.D{{Key: "age", Value: bson.D{{Key: "$gte", Value: int32(25)}}}}}},
 		{{Key: "$group", Value: bson.D{
@@ -647,6 +674,7 @@ func TestComplexPipeline(t *testing.T) {
 	}
 
 	// 验证按平均分降序排列
+	// EN: Verify sorted by average score descending.
 	if len(results) >= 2 {
 		score1 := getDocField(results[0], "avgScore").(float64)
 		score2 := getDocField(results[1], "avgScore").(float64)
@@ -664,6 +692,7 @@ func TestEmptyPipeline(t *testing.T) {
 	insertTestData(t, col)
 
 	// 空管道应返回所有文档
+	// EN: An empty pipeline should return all documents.
 	pipeline := []bson.D{}
 
 	results, err := col.Aggregate(pipeline)
@@ -684,6 +713,7 @@ func TestGroupWithNullId(t *testing.T) {
 	insertTestData(t, col)
 
 	// _id 为 null 时，所有文档归入一组
+	// EN: When _id is null, all documents should fall into one group.
 	pipeline := []bson.D{
 		{{Key: "$group", Value: bson.D{
 			{Key: "_id", Value: nil},
@@ -720,6 +750,7 @@ func TestGroupWithFirstLast(t *testing.T) {
 	col, _ := db.Collection("test")
 
 	// 插入有序数据
+	// EN: Insert ordered data.
 	docs := []bson.D{
 		{{Key: "group", Value: "A"}, {Key: "order", Value: int32(1)}, {Key: "value", Value: "first"}},
 		{{Key: "group", Value: "A"}, {Key: "order", Value: int32(2)}, {Key: "value", Value: "middle"}},
@@ -766,6 +797,7 @@ func TestInvalidPipelineStage(t *testing.T) {
 	insertTestData(t, col)
 
 	// 无效的阶段
+	// EN: Invalid stage.
 	pipeline := []bson.D{
 		{{Key: "$invalidStage", Value: bson.D{}}},
 	}
@@ -784,6 +816,7 @@ func TestAggregateCommand(t *testing.T) {
 	insertTestData(t, col)
 
 	// 通过 RunCommand 执行聚合
+	// EN: Run aggregation via RunCommand.
 	cmd := bson.D{
 		{Key: "aggregate", Value: "test"},
 		{Key: "pipeline", Value: bson.A{
@@ -799,6 +832,7 @@ func TestAggregateCommand(t *testing.T) {
 	}
 
 	// 检查返回格式
+	// EN: Check response format.
 	ok := getDocField(result, "ok")
 	if ok != int32(1) {
 		t.Errorf("期望 ok=1，实际 %v", ok)
@@ -826,6 +860,7 @@ func TestSkipLimitCombination(t *testing.T) {
 	insertTestData(t, col)
 
 	// 先排序，再跳过，再限制
+	// EN: Sort first, then skip, then limit.
 	pipeline := []bson.D{
 		{{Key: "$sort", Value: bson.D{{Key: "age", Value: int32(1)}}}},
 		{{Key: "$skip", Value: int32(1)}},
@@ -850,6 +885,7 @@ func TestMatchAndProject(t *testing.T) {
 	insertTestData(t, col)
 
 	// 筛选后投影
+	// EN: Project after match.
 	pipeline := []bson.D{
 		{{Key: "$match", Value: bson.D{{Key: "age", Value: bson.D{{Key: "$gt", Value: int32(25)}}}}}},
 		{{Key: "$project", Value: bson.D{
@@ -865,6 +901,7 @@ func TestMatchAndProject(t *testing.T) {
 	}
 
 	// age > 25 的有 Bob(30), David(35), Eve(28)
+	// EN: age > 25 includes Bob(30), David(35), Eve(28).
 	if len(results) != 3 {
 		t.Errorf("期望 3 条结果，实际 %d 条", len(results))
 	}

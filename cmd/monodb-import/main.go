@@ -1,7 +1,10 @@
 // Created by Yanjunhui
 //
 // monodb-import: 数据导入工具
+// EN: monodb-import is a data import tool.
+//
 // 支持导入 mongodump 的 BSON 文件和 JSON/JSONL 格式数据
+// EN: It supports importing mongodump BSON files and JSON/JSONL data.
 
 package main
 
@@ -61,6 +64,7 @@ func main() {
 	}
 
 	// 打开数据库
+	// EN: Open database.
 	db, err := engine.OpenDatabase(*dbPath)
 	if err != nil {
 		log.Fatalf("打开数据库失败: %v", err)
@@ -69,14 +73,17 @@ func main() {
 
 	if *inputDir != "" {
 		// 导入目录
+		// EN: Import a directory.
 		if err := importDirectory(db, *inputDir); err != nil {
 			log.Fatalf("导入目录失败: %v", err)
 		}
 	} else {
 		// 导入单个文件
+		// EN: Import a single file.
 		colName := *collection
 		if colName == "" {
 			// 从文件名推断集合名
+			// EN: Infer collection name from filename.
 			base := filepath.Base(*inputFile)
 			colName = strings.TrimSuffix(base, filepath.Ext(base))
 		}
@@ -87,6 +94,7 @@ func main() {
 	}
 
 	// 刷新到磁盘
+	// EN: Flush to disk.
 	if err := db.Flush(); err != nil {
 		log.Fatalf("刷新数据失败: %v", err)
 	}
@@ -95,6 +103,7 @@ func main() {
 }
 
 // importDirectory 导入目录中的所有文件
+// EN: importDirectory imports all supported files under a directory.
 func importDirectory(db *engine.Database, dir string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -124,16 +133,19 @@ func importDirectory(db *engine.Database, dir string) error {
 }
 
 // importFile 导入单个文件
+// EN: importFile imports a single file into the given collection.
 func importFile(db *engine.Database, filePath, colName string) error {
 	ext := strings.ToLower(filepath.Ext(filePath))
 
 	// 获取或创建集合
+	// EN: Get or create collection.
 	col, err := db.Collection(colName)
 	if err != nil {
 		return fmt.Errorf("获取集合失败: %w", err)
 	}
 
 	// 如果指定了 drop，先删除集合
+	// EN: If -drop is set, drop the existing collection first.
 	if *drop {
 		if err := db.DropCollection(colName); err != nil {
 			return fmt.Errorf("删除集合失败: %w", err)
@@ -163,6 +175,7 @@ func importFile(db *engine.Database, filePath, colName string) error {
 }
 
 // importBSON 导入 BSON 文件
+// EN: importBSON imports a BSON file (mongodump-style concatenated BSON documents).
 func importBSON(col *engine.Collection, filePath string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -175,6 +188,7 @@ func importBSON(col *engine.Collection, filePath string) error {
 
 	for {
 		// 读取文档长度（4 字节 little-endian）
+		// EN: Read document length (4-byte little-endian).
 		lenBuf := make([]byte, 4)
 		if _, err := io.ReadFull(file, lenBuf); err != nil {
 			if err == io.EOF {
@@ -189,6 +203,7 @@ func importBSON(col *engine.Collection, filePath string) error {
 		}
 
 		// 读取完整文档
+		// EN: Read full document bytes.
 		docBuf := make([]byte, docLen)
 		copy(docBuf[:4], lenBuf)
 		if _, err := io.ReadFull(file, docBuf[4:]); err != nil {
@@ -196,6 +211,7 @@ func importBSON(col *engine.Collection, filePath string) error {
 		}
 
 		// 解析 BSON
+		// EN: Parse BSON.
 		var doc bson.D
 		if err := bson.Unmarshal(docBuf, &doc); err != nil {
 			return fmt.Errorf("解析 BSON 失败: %w", err)
@@ -205,6 +221,7 @@ func importBSON(col *engine.Collection, filePath string) error {
 		count++
 
 		// 批量插入
+		// EN: Batch insert.
 		if len(batch) >= *batchSize {
 			if _, err := col.Insert(batch...); err != nil {
 				return fmt.Errorf("插入文档失败: %w", err)
@@ -217,6 +234,7 @@ func importBSON(col *engine.Collection, filePath string) error {
 	}
 
 	// 插入剩余文档
+	// EN: Insert remaining documents.
 	if len(batch) > 0 {
 		if _, err := col.Insert(batch...); err != nil {
 			return fmt.Errorf("插入文档失败: %w", err)
@@ -228,6 +246,7 @@ func importBSON(col *engine.Collection, filePath string) error {
 }
 
 // importJSONL 导入 JSON Lines 格式
+// EN: importJSONL imports JSON Lines (one JSON document per line).
 func importJSONL(col *engine.Collection, filePath string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -240,6 +259,7 @@ func importJSONL(col *engine.Collection, filePath string) error {
 	scanner := bufio.NewScanner(file)
 
 	// 增加缓冲区大小以支持大文档
+	// EN: Increase scanner buffer size to support large documents.
 	const maxScanTokenSize = 16 * 1024 * 1024
 	buf := make([]byte, maxScanTokenSize)
 	scanner.Buffer(buf, maxScanTokenSize)
@@ -253,6 +273,7 @@ func importJSONL(col *engine.Collection, filePath string) error {
 		var doc bson.D
 		if err := bson.UnmarshalExtJSON([]byte(line), true, &doc); err != nil {
 			// 尝试用标准 JSON 解析
+			// EN: Fallback to standard JSON unmarshal.
 			var m map[string]interface{}
 			if err := json.Unmarshal([]byte(line), &m); err != nil {
 				return fmt.Errorf("解析 JSON 失败 (行 %d): %w", count+1, err)
@@ -289,6 +310,7 @@ func importJSONL(col *engine.Collection, filePath string) error {
 }
 
 // importJSONArray 导入 JSON 数组格式
+// EN: importJSONArray imports a JSON array file.
 func importJSONArray(col *engine.Collection, filePath string) error {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
@@ -298,6 +320,7 @@ func importJSONArray(col *engine.Collection, filePath string) error {
 	var docs []bson.D
 	if err := bson.UnmarshalExtJSON(data, true, &docs); err != nil {
 		// 尝试用标准 JSON 解析
+		// EN: Fallback to standard JSON unmarshal.
 		var arr []map[string]interface{}
 		if err := json.Unmarshal(data, &arr); err != nil {
 			return fmt.Errorf("解析 JSON 数组失败: %w", err)
@@ -309,6 +332,7 @@ func importJSONArray(col *engine.Collection, filePath string) error {
 	}
 
 	// 批量插入
+	// EN: Batch insert.
 	for i := 0; i < len(docs); i += *batchSize {
 		end := i + *batchSize
 		if end > len(docs) {
@@ -327,6 +351,7 @@ func importJSONArray(col *engine.Collection, filePath string) error {
 }
 
 // mapToDoc 将 map 转换为 bson.D
+// EN: mapToDoc converts a map into bson.D recursively.
 func mapToDoc(m map[string]interface{}) bson.D {
 	doc := make(bson.D, 0, len(m))
 	for k, v := range m {
@@ -336,6 +361,7 @@ func mapToDoc(m map[string]interface{}) bson.D {
 }
 
 // convertValue 转换值类型
+// EN: convertValue converts nested map/slice values into BSON-friendly types.
 func convertValue(v interface{}) interface{} {
 	switch val := v.(type) {
 	case map[string]interface{}:

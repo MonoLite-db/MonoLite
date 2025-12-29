@@ -16,6 +16,7 @@ func TestCollectionDeleteAndDeleteOne(t *testing.T) {
 	insertTestData(t, col)
 
 	// DeleteOne：删除一条 Beijing 的文档
+	// EN: DeleteOne: delete one document with city=Beijing.
 	deletedOne, err := col.DeleteOne(bson.D{{Key: "city", Value: "Beijing"}})
 	if err != nil {
 		t.Fatalf("DeleteOne failed: %v", err)
@@ -33,6 +34,7 @@ func TestCollectionDeleteAndDeleteOne(t *testing.T) {
 	}
 
 	// Delete：删除所有 Shanghai 的文档（应有 2 条）
+	// EN: Delete: delete all documents with city=Shanghai (should be 2).
 	deletedMany, err := col.Delete(bson.D{{Key: "city", Value: "Shanghai"}})
 	if err != nil {
 		t.Fatalf("Delete failed: %v", err)
@@ -58,7 +60,9 @@ func TestCollectionFindAndModify_UpdateNewAndSort(t *testing.T) {
 	insertTestData(t, col)
 
 	// city=Shanghai 有两条：Bob(score=90) 和 Eve(score=88)
+	// EN: There are two docs with city=Shanghai: Bob(score=90) and Eve(score=88).
 	// sort 按 score 降序，应选 Bob
+	// EN: Sort by score descending; Bob should be chosen.
 	original, err := col.FindAndModify(&FindAndModifyOptions{
 		Query:  bson.D{{Key: "city", Value: "Shanghai"}},
 		Update: bson.D{{Key: "$set", Value: bson.D{{Key: "tag", Value: "chosen"}}}},
@@ -103,6 +107,7 @@ func TestCollectionFindAndModify_RemoveAndUpsert(t *testing.T) {
 	insertTestData(t, col)
 
 	// Remove：删除一条 Shenzhen 的文档（David）
+	// EN: Remove: delete one document with city=Shenzhen (David).
 	removed, err := col.FindAndModify(&FindAndModifyOptions{
 		Query:  bson.D{{Key: "city", Value: "Shenzhen"}},
 		Remove: true,
@@ -119,6 +124,7 @@ func TestCollectionFindAndModify_RemoveAndUpsert(t *testing.T) {
 	}
 
 	// Upsert：未命中则插入
+	// EN: Upsert: insert if no document matches.
 	upsertDoc, err := col.FindAndModify(&FindAndModifyOptions{
 		Query:  bson.D{{Key: "name", Value: "Zoe"}},
 		Update: bson.D{{Key: "$set", Value: bson.D{{Key: "age", Value: int32(18)}}}},
@@ -162,11 +168,13 @@ func TestCollectionDistinct(t *testing.T) {
 		t.Fatalf("Distinct failed: %v", err)
 	}
 	// 期望 Beijing/Shanghai/Shenzhen 三个
+	// EN: Expect three cities: Beijing/Shanghai/Shenzhen.
 	if len(cities) != 3 {
 		t.Fatalf("expected 3 distinct cities, got %d: %v", len(cities), cities)
 	}
 
 	// 过滤后 distinct：Beijing 的 age 只有 25
+	// EN: Distinct with a filter: Beijing's age should only be 25.
 	ages, err := col.Distinct("age", bson.D{{Key: "city", Value: "Beijing"}})
 	if err != nil {
 		t.Fatalf("Distinct failed: %v", err)
@@ -175,5 +183,3 @@ func TestCollectionDistinct(t *testing.T) {
 		t.Fatalf("expected distinct ages=[25], got %v", ages)
 	}
 }
-
-

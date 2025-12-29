@@ -26,6 +26,7 @@ func TestBTreeBasic(t *testing.T) {
 	}
 
 	// 插入测试数据
+	// EN: Insert test data.
 	for i := 0; i < 100; i++ {
 		key := []byte(fmt.Sprintf("key%03d", i))
 		value := []byte(fmt.Sprintf("value%03d", i))
@@ -35,11 +36,13 @@ func TestBTreeBasic(t *testing.T) {
 	}
 
 	// 验证树结构
+	// EN: Verify tree structure.
 	if err := tree.Verify(); err != nil {
 		t.Fatalf("Tree verification failed: %v", err)
 	}
 
 	// 搜索测试
+	// EN: Search tests.
 	for i := 0; i < 100; i++ {
 		key := []byte(fmt.Sprintf("key%03d", i))
 		expectedValue := []byte(fmt.Sprintf("value%03d", i))
@@ -53,6 +56,7 @@ func TestBTreeBasic(t *testing.T) {
 	}
 
 	// 计数测试
+	// EN: Count test.
 	count, err := tree.Count()
 	if err != nil {
 		t.Fatalf("Failed to count: %v", err)
@@ -78,6 +82,7 @@ func TestBTreeDelete(t *testing.T) {
 	}
 
 	// 插入数据
+	// EN: Insert data.
 	n := 50
 	for i := 0; i < n; i++ {
 		key := []byte(fmt.Sprintf("key%03d", i))
@@ -88,6 +93,7 @@ func TestBTreeDelete(t *testing.T) {
 	}
 
 	// 删除一半的键
+	// EN: Delete half of the keys.
 	for i := 0; i < n; i += 2 {
 		key := []byte(fmt.Sprintf("key%03d", i))
 		if err := tree.Delete(key); err != nil {
@@ -96,21 +102,25 @@ func TestBTreeDelete(t *testing.T) {
 	}
 
 	// 验证树结构
+	// EN: Verify tree structure.
 	if err := tree.Verify(); err != nil {
 		t.Fatalf("Tree verification failed after delete: %v", err)
 	}
 
 	// 验证删除成功
+	// EN: Verify deletions succeeded.
 	for i := 0; i < n; i++ {
 		key := []byte(fmt.Sprintf("key%03d", i))
 		value, _ := tree.Search(key)
 		if i%2 == 0 {
 			// 应该被删除
+			// EN: Should be deleted.
 			if value != nil {
 				t.Errorf("Key %d should be deleted but found", i)
 			}
 		} else {
 			// 应该存在
+			// EN: Should exist.
 			if value == nil {
 				t.Errorf("Key %d should exist but not found", i)
 			}
@@ -118,6 +128,7 @@ func TestBTreeDelete(t *testing.T) {
 	}
 
 	// 计数
+	// EN: Count.
 	count, _ := tree.Count()
 	if count != n/2 {
 		t.Errorf("Count mismatch after delete: expected %d, got %d", n/2, count)
@@ -140,6 +151,7 @@ func TestBTreeRangeSearch(t *testing.T) {
 	}
 
 	// 插入数据
+	// EN: Insert data.
 	for i := 0; i < 100; i++ {
 		key := []byte(fmt.Sprintf("%03d", i))
 		value := []byte(fmt.Sprintf("v%03d", i))
@@ -147,6 +159,7 @@ func TestBTreeRangeSearch(t *testing.T) {
 	}
 
 	// 范围查询 [020, 030]
+	// EN: Range query [020, 030].
 	results, err := tree.SearchRange([]byte("020"), []byte("030"), true, true)
 	if err != nil {
 		t.Fatalf("Range search failed: %v", err)
@@ -157,6 +170,7 @@ func TestBTreeRangeSearch(t *testing.T) {
 	}
 
 	// 范围查询 (020, 030)
+	// EN: Range query (020, 030).
 	results, err = tree.SearchRange([]byte("020"), []byte("030"), false, false)
 	if err != nil {
 		t.Fatalf("Range search failed: %v", err)
@@ -187,11 +201,13 @@ func TestBTreeUnique(t *testing.T) {
 	value2 := []byte("value2")
 
 	// 第一次插入应该成功
+	// EN: The first insert should succeed.
 	if err := tree.Insert(key, value1); err != nil {
 		t.Fatalf("First insert should succeed: %v", err)
 	}
 
 	// 第二次插入相同键应该失败
+	// EN: Inserting the same key a second time should fail.
 	if err := tree.Insert(key, value2); err == nil {
 		t.Error("Second insert of duplicate key should fail")
 	}
@@ -219,6 +235,7 @@ func TestBTreeLargeDataset(t *testing.T) {
 	n := 10000
 
 	// 随机顺序插入
+	// EN: Insert in random order.
 	keys := make([]int, n)
 	for i := 0; i < n; i++ {
 		keys[i] = i
@@ -236,6 +253,7 @@ func TestBTreeLargeDataset(t *testing.T) {
 	}
 
 	// 验证
+	// EN: Verify.
 	if err := tree.Verify(); err != nil {
 		t.Fatalf("Tree verification failed: %v", err)
 	}
@@ -246,10 +264,12 @@ func TestBTreeLargeDataset(t *testing.T) {
 	}
 
 	// 获取高度
+	// EN: Get height.
 	height, _ := tree.Height()
 	t.Logf("Tree height for %d keys: %d", n, height)
 
 	// 随机删除一半
+	// EN: Randomly delete half.
 	rand.Shuffle(len(keys), func(i, j int) {
 		keys[i], keys[j] = keys[j], keys[i]
 	})
@@ -262,6 +282,7 @@ func TestBTreeLargeDataset(t *testing.T) {
 	}
 
 	// 再次验证
+	// EN: Verify again.
 	if err := tree.Verify(); err != nil {
 		t.Fatalf("Tree verification failed after delete: %v", err)
 	}
@@ -288,6 +309,7 @@ func TestBTreeLeafChain(t *testing.T) {
 	}
 
 	// 插入足够多的数据触发分裂
+	// EN: Insert enough entries to trigger splits.
 	n := 200
 	for i := 0; i < n; i++ {
 		key := []byte(fmt.Sprintf("%05d", i))
@@ -296,11 +318,13 @@ func TestBTreeLeafChain(t *testing.T) {
 	}
 
 	// 验证叶子链表
+	// EN: Verify leaf linked list.
 	if err := tree.Verify(); err != nil {
 		t.Fatalf("Leaf chain verification failed: %v", err)
 	}
 
 	// 获取所有键，验证顺序
+	// EN: Get all keys and verify order.
 	keys, err := tree.GetAllKeys()
 	if err != nil {
 		t.Fatalf("Failed to get all keys: %v", err)
@@ -311,10 +335,10 @@ func TestBTreeLeafChain(t *testing.T) {
 	}
 
 	// 验证顺序
+	// EN: Verify order.
 	for i := 1; i < len(keys); i++ {
 		if bytes.Compare(keys[i-1], keys[i]) >= 0 {
 			t.Errorf("Keys not in order at index %d", i)
 		}
 	}
 }
-

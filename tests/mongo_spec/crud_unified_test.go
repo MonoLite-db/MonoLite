@@ -20,17 +20,27 @@ import (
 )
 
 // 说明：
+// EN: Notes:
 // - MongoDB specifications（Unified Test Format）覆盖面非常广；
+// EN: - MongoDB specifications (Unified Test Format) cover a very broad surface area.
 // - MonoLite 目前尚未完整支持所有操作/选项/事件断言；
+// EN: - MonoLite does not yet fully support all operations/options/event assertions.
 // - 因此本 runner 采用“先小步跑通，再逐步扩展”的策略：
+// EN: - Therefore this runner follows a “get a small subset working first, then expand gradually” strategy:
 //   - 默认跳过（避免影响日常 go test ./...）；
+// EN:   - Skip by default (to avoid impacting day-to-day `go test ./...`).
 //   - 仅运行我们明确支持的 operation + 断言；
+// EN:   - Only run operations + assertions we explicitly support.
 //   - 对包含 expectEvents / observeEvents / 复杂选项的用例直接 Skip，并给出原因。
+// EN:   - For test cases containing expectEvents/observeEvents/complex options, skip with a reason.
 
 const (
-	envRunSpecs  = "MONOLITE_RUN_MONGO_SPECS"      // 设为 1 才运行
-	envSpecsGlob = "MONOLITE_MONGO_SPECS_GLOB"     // 可选：指定 glob（相对 unified 目录），例如 "find*.json"
+	envRunSpecs = "MONOLITE_RUN_MONGO_SPECS" // 设为 1 才运行
+	// EN: Set to 1 to enable running the spec tests.
+	envSpecsGlob = "MONOLITE_MONGO_SPECS_GLOB" // 可选：指定 glob（相对 unified 目录），例如 "find*.json"
+	// EN: Optional: glob (relative to the unified dir), e.g. "find*.json".
 	envSpecsFile = "MONOLITE_MONGO_SPECS_FILENAME" // 可选：指定单个文件名，例如 "find.json"
+	// EN: Optional: single filename, e.g. "find.json".
 )
 
 func TestMongoDBSpecifications_UnifiedCRUD(t *testing.T) {
@@ -66,7 +76,9 @@ func TestMongoDBSpecifications_UnifiedCRUD(t *testing.T) {
 				tc := tc
 				t.Run(tc.Description, func(t *testing.T) {
 					// Unified CRUD 规范文件里的多个 test case 通常都假设从相同的 initialData 起步。
+					// EN: Multiple test cases in a Unified CRUD spec file usually assume the same initialData baseline.
 					// MonoLite 目前不支持 dropDatabase，因此这里用“每个 test case 独立 server 实例”确保隔离。
+					// EN: MonoLite does not support dropDatabase yet, so we isolate by starting a fresh server per test case.
 					h := testkit.StartMonoLite(t)
 					defer h.Close()
 
@@ -83,6 +95,7 @@ func TestMongoDBSpecifications_UnifiedCRUD(t *testing.T) {
 					defer client.Disconnect(ctx)
 
 					// 初始化数据（按 spec 的 database/collection 名称直接操作）
+					// EN: Initialize data (operate directly using the spec's database/collection names).
 					if err := applyInitialData(ctx, client, spec.InitialData); err != nil {
 						t.Fatalf("applyInitialData failed: %v", err)
 					}
@@ -109,6 +122,7 @@ func TestMongoDBSpecifications_UnifiedCRUD(t *testing.T) {
 					}
 
 					// outcome 断言（很多用例没有 outcome；这里先支持最常见的 collection data 断言）
+					// EN: Outcome assertions (many cases have no outcome; we first support the most common collection-data checks).
 					if len(tc.Outcome) > 0 {
 						if err := assertOutcomeCollections(ctx, client, tc.Outcome); err != nil {
 							t.Fatalf("outcome mismatch: %v", err)
@@ -150,6 +164,7 @@ func selectSpecFiles(unifiedDir string) ([]string, error) {
 	pattern := os.Getenv(envSpecsGlob)
 	if pattern == "" {
 		// 默认只跑最基础的一小批（避免一次性把工程拖进“海量跳过/长耗时”）
+		// EN: By default, run only a small basic subset (avoid dragging the project into “mass skips/long runtimes”).
 		pattern = "{find,insertOne,insertMany,deleteOne,deleteMany,distinct}.json"
 	}
 
@@ -158,6 +173,7 @@ func selectSpecFiles(unifiedDir string) ([]string, error) {
 		return nil, err
 	}
 	// 兜底：如果 pattern 里用了 brace 扩展，filepath.Glob 不支持，会返回空。
+	// EN: Fallback: filepath.Glob doesn't support brace expansion in patterns and may return empty results.
 	if len(matches) == 0 && strings.Contains(pattern, "{") {
 		alts := []string{"find.json", "insertOne.json", "insertMany.json", "deleteOne.json", "deleteMany.json", "distinct.json"}
 		for _, a := range alts {
@@ -175,12 +191,13 @@ func selectSpecFiles(unifiedDir string) ([]string, error) {
 // -----------------------------
 
 type unifiedSpec struct {
-	Description    string          `json:"description"`
-	SchemaVersion  string          `json:"schemaVersion"`
-	CreateEntities []entitySpec    `json:"createEntities"`
-	InitialData    []initialData   `json:"initialData"`
-	Tests          []unifiedTest   `json:"tests"`
+	Description    string        `json:"description"`
+	SchemaVersion  string        `json:"schemaVersion"`
+	CreateEntities []entitySpec  `json:"createEntities"`
+	InitialData    []initialData `json:"initialData"`
+	Tests          []unifiedTest `json:"tests"`
 	// 其余字段暂不需要
+	// EN: Other fields are not needed for now.
 }
 
 type entitySpec struct {
@@ -234,7 +251,7 @@ type outcomeColl struct {
 }
 
 type entityBindings struct {
-	dbByID        map[string]string // database id -> name
+	dbByID         map[string]string // database id -> name
 	collectionByID map[string]struct {
 		dbName   string
 		collName string
@@ -287,8 +304,11 @@ func applyInitialData(ctx context.Context, client *mongo.Client, init []initialD
 		coll := db.Collection(item.CollectionName)
 
 		// runner 的隔离单位是“每个 spec 文件一套新 server + 新数据文件”，因此通常无需清库。
+		// EN: This runner isolates by "one new server + one new data file per spec file", so cleaning is usually unnecessary.
 		// 为避免 MonoLite 尚未实现 dropDatabase 导致失败，这里不再调用 db.Drop()。
+		// EN: To avoid failures due to MonoLite not implementing dropDatabase, we do not call db.Drop() here.
 		// 如果未来改为“复用同一 server 跑多个文件”，可以在这里做更严格的清理策略。
+		// EN: If we later reuse one server for multiple files, implement a stricter cleanup strategy here.
 
 		var docs []interface{}
 		for _, d := range item.Documents {
@@ -373,6 +393,7 @@ func execFind(ctx context.Context, coll *mongo.Collection, args map[string]inter
 		findOpts.SetLimit(n)
 	}
 	// batchSize 作为 driver 行为/事件断言的一部分，MonoLite runner 先不强行对齐，只保证结果集正确
+	// EN: batchSize affects driver behavior/event assertions; this runner doesn't enforce it yet, only correctness of the result set.
 
 	cur, err := coll.Find(ctx, filter, findOpts)
 	if err != nil {
@@ -473,6 +494,7 @@ func execDistinct(ctx context.Context, coll *mongo.Collection, args map[string]i
 
 func assertExpectResult(opName string, got interface{}, expect interface{}) error {
 	// 目前只对部分类型做精确断言；其余暂不支持
+	// EN: Only a subset of types have strict assertions for now; others are not supported yet.
 	switch opName {
 	case "find":
 		gotDocs, ok := got.([]bson.D)
@@ -555,6 +577,7 @@ func assertExpectMap(got interface{}, expect interface{}) error {
 	}
 
 	// 支持最常见的 $$unsetOrMatches 形态（用于 insertedId/insertedIds 等返回值）
+	// EN: Support the common $$unsetOrMatches form (used for insertedId/insertedIds and similar fields).
 	if inner, ok := unwrapUnsetOrMatches(expMap); ok {
 		expMap, ok = inner.(map[string]interface{})
 		if !ok {
@@ -573,7 +596,9 @@ func assertExpectMap(got interface{}, expect interface{}) error {
 		}
 
 		// specs 里 insertedIds 通常是一个“索引->id”的文档（JSON object），而 driver 返回 []interface{}。
+		// EN: In specs, insertedIds is usually a document mapping "index->id" (JSON object), while the driver returns []interface{}.
 		// 这里做一个最小兼容：把 []interface{} 转成 map[string]interface{} 再比较。
+		// EN: Minimal compatibility: convert []interface{} into map[string]interface{} before comparing.
 		if k == "insertedIds" {
 			if gotArr, ok := gotVal.([]interface{}); ok {
 				if _, ok := expVal.(map[string]interface{}); ok {
@@ -611,6 +636,7 @@ func unwrapUnsetOrMatchesRecursive(v interface{}) interface{} {
 
 func looseEqual(a, b interface{}) bool {
 	// 数字尽量按 int64 比较，减少 int32/int64/float64 差异导致的误报
+	// EN: Prefer comparing numbers as int64 to reduce false positives from int32/int64/float64 differences.
 	if ai, ok := asInt64(a); ok {
 		if bi, ok := asInt64(b); ok {
 			return ai == bi
@@ -649,6 +675,7 @@ func assertValuesEqual(got []interface{}, expect []interface{}) error {
 		return fmt.Errorf("value count mismatch: got=%d want=%d (got=%v expect=%v)", len(got), len(expect), got, expect)
 	}
 	// distinct 的结果在很多用例里顺序不敏感；但为避免误报，这里先按字符串化排序再对比
+	// EN: Distinct results are often order-insensitive; to avoid false positives, compare after sorting stringified values.
 	gs := make([]string, len(got))
 	es := make([]string, len(expect))
 	for i := range got {
@@ -684,14 +711,17 @@ func sortStrings(a []string) {
 
 func toBsonD(v interface{}) (bson.D, error) {
 	// 通过 JSON 重新序列化，再用 Extended JSON 解码为 bson.D
+	// EN: Re-marshal via JSON, then decode as Extended JSON into bson.D.
 	data, err := json.Marshal(v)
 	if err != nil {
 		return nil, err
 	}
 	var out bson.D
 	// 这里使用 relaxed=false，尽量保持规范测试的类型语义
+	// EN: Use relaxed=false to preserve spec-test type semantics as much as possible.
 	if err := bson.UnmarshalExtJSON(data, false, &out); err != nil {
 		// 部分测试使用 relaxed 语义；做一次兜底
+		// EN: Some tests use relaxed semantics; fallback once.
 		if err2 := bson.UnmarshalExtJSON(data, true, &out); err2 != nil {
 			return nil, err
 		}
@@ -720,5 +750,3 @@ func asInt64(v interface{}) (int64, bool) {
 		return 0, false
 	}
 }
-
-

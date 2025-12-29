@@ -61,6 +61,7 @@ func TestReplaceRootStage_NewRootFieldAndExpr(t *testing.T) {
 	}
 
 	// newRoot 为表达式文档：{x:"$age", y:"lit"}
+	// EN: newRoot is an expression document: {x:"$age", y:"lit"}.
 	out2, err := col.Aggregate([]bson.D{
 		{{Key: "$replaceRoot", Value: bson.D{{Key: "newRoot", Value: bson.D{
 			{Key: "x", Value: "$age"},
@@ -86,6 +87,7 @@ func TestLookupStage_SuccessAndMissingFrom(t *testing.T) {
 	orders, _ := db.Collection("orders")
 
 	// 用 int32 作为 _id，便于 join
+	// EN: Use int32 as _id to make joining easier.
 	_, _ = users.Insert(
 		bson.D{{Key: "_id", Value: int32(1)}, {Key: "name", Value: "u1"}},
 		bson.D{{Key: "_id", Value: int32(2)}, {Key: "name", Value: "u2"}},
@@ -111,6 +113,7 @@ func TestLookupStage_SuccessAndMissingFrom(t *testing.T) {
 	}
 
 	// orderId=10 应匹配到一个 user
+	// EN: orderId=10 should match exactly one user.
 	var matched bson.D
 	for _, d := range out {
 		if getDocField(d, "orderId") == int32(10) {
@@ -127,6 +130,7 @@ func TestLookupStage_SuccessAndMissingFrom(t *testing.T) {
 	}
 
 	// from 集合不存在：应返回空数组且不报错
+	// EN: If the "from" collection does not exist, return an empty array and no error.
 	out2, err := orders.Aggregate([]bson.D{
 		{{Key: "$lookup", Value: bson.D{
 			{Key: "from", Value: "no_such_collection"},
@@ -148,6 +152,7 @@ func TestLookupStage_SuccessAndMissingFrom(t *testing.T) {
 
 func TestPipelineLookupWithoutDBContextReturnsStageError(t *testing.T) {
 	// 直接使用 NewPipeline（db=nil）构造包含 $lookup 的 pipeline，触发错误路径
+	// EN: Build a pipeline with $lookup via NewPipeline (db=nil) to hit the error path.
 	p, err := NewPipeline([]bson.D{
 		{{Key: "$lookup", Value: bson.D{
 			{Key: "from", Value: "x"},
@@ -162,6 +167,7 @@ func TestPipelineLookupWithoutDBContextReturnsStageError(t *testing.T) {
 		t.Fatalf("expected Execute to fail due to missing db context")
 	}
 	// 期望包含 stage.Name() 拼出来的上下文信息（覆盖 Name 的错误路径调用）
+	// EN: Expect error text to include context built from stage.Name() (covers Name() in the error path).
 	if !bytes.Contains([]byte(err.Error()), []byte("error in $lookup stage")) {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -178,5 +184,3 @@ func TestSortByFields_UsesMongoCompareRules(t *testing.T) {
 		t.Fatalf("unexpected sort result: %v", sorted)
 	}
 }
-
-

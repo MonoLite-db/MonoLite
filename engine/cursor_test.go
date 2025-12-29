@@ -14,6 +14,7 @@ func TestCursorManagerBasic(t *testing.T) {
 	defer cm.Stop()
 
 	// 创建测试文档
+	// EN: Create test documents.
 	docs := []bson.D{
 		{{Key: "a", Value: 1}},
 		{{Key: "a", Value: 2}},
@@ -23,6 +24,7 @@ func TestCursorManagerBasic(t *testing.T) {
 	}
 
 	// 创建游标
+	// EN: Create a cursor.
 	cursor := cm.CreateCursor("test.collection", docs, 2)
 	if cursor == nil {
 		t.Fatal("创建游标失败")
@@ -42,6 +44,7 @@ func TestCursorGetMore(t *testing.T) {
 	defer cm.Stop()
 
 	// 创建 10 个文档
+	// EN: Create 10 documents.
 	docs := make([]bson.D, 10)
 	for i := 0; i < 10; i++ {
 		docs[i] = bson.D{{Key: "index", Value: i}}
@@ -51,6 +54,7 @@ func TestCursorGetMore(t *testing.T) {
 	cursorID := cursor.ID
 
 	// 第一次 GetMore：获取 3 个
+	// EN: First GetMore: fetch 3.
 	batch1, hasMore1, err := cm.GetMore(cursorID, 3)
 	if err != nil {
 		t.Fatalf("GetMore 失败: %v", err)
@@ -63,6 +67,7 @@ func TestCursorGetMore(t *testing.T) {
 	}
 
 	// 第二次 GetMore：获取 3 个
+	// EN: Second GetMore: fetch 3.
 	batch2, hasMore2, err := cm.GetMore(cursorID, 3)
 	if err != nil {
 		t.Fatalf("GetMore 失败: %v", err)
@@ -75,6 +80,7 @@ func TestCursorGetMore(t *testing.T) {
 	}
 
 	// 第三次 GetMore：获取 3 个（但只剩 4 个）
+	// EN: Third GetMore: fetch 3 (but only 4 remain).
 	batch3, hasMore3, err := cm.GetMore(cursorID, 3)
 	if err != nil {
 		t.Fatalf("GetMore 失败: %v", err)
@@ -87,6 +93,7 @@ func TestCursorGetMore(t *testing.T) {
 	}
 
 	// 第四次 GetMore：获取最后 1 个
+	// EN: Fourth GetMore: fetch the last 1.
 	batch4, hasMore4, err := cm.GetMore(cursorID, 3)
 	if err != nil {
 		t.Fatalf("GetMore 失败: %v", err)
@@ -99,6 +106,7 @@ func TestCursorGetMore(t *testing.T) {
 	}
 
 	// 游标应该已被删除
+	// EN: The cursor should have been removed.
 	if cm.Count() != 0 {
 		t.Errorf("期望 0 个游标，实际 %d 个", cm.Count())
 	}
@@ -121,6 +129,7 @@ func TestCursorKill(t *testing.T) {
 	}
 
 	// 关闭游标
+	// EN: Kill the cursor.
 	killed := cm.KillCursor(cursorID)
 	if !killed {
 		t.Error("关闭游标应该返回 true")
@@ -131,6 +140,7 @@ func TestCursorKill(t *testing.T) {
 	}
 
 	// 再次关闭应该返回 false
+	// EN: Killing again should return false.
 	killed = cm.KillCursor(cursorID)
 	if killed {
 		t.Error("再次关闭游标应该返回 false")
@@ -152,6 +162,7 @@ func TestCursorKillMultiple(t *testing.T) {
 	}
 
 	// 关闭两个游标
+	// EN: Kill two cursors.
 	killed := cm.KillCursors([]int64{cursor1.ID, cursor3.ID})
 	if len(killed) != 2 {
 		t.Errorf("期望关闭 2 个游标，实际 %d 个", len(killed))
@@ -162,6 +173,7 @@ func TestCursorKillMultiple(t *testing.T) {
 	}
 
 	// cursor2 应该还在
+	// EN: cursor2 should still exist.
 	if cm.GetCursor(cursor2.ID) == nil {
 		t.Error("cursor2 应该还存在")
 	}
@@ -172,6 +184,7 @@ func TestGetFirstBatch(t *testing.T) {
 	defer cm.Stop()
 
 	// 测试所有文档都能在首批返回的情况
+	// EN: Case where all documents fit in the first batch.
 	docs := []bson.D{
 		{{Key: "a", Value: 1}},
 		{{Key: "a", Value: 2}},
@@ -187,6 +200,7 @@ func TestGetFirstBatch(t *testing.T) {
 	}
 
 	// 测试需要游标的情况
+	// EN: Case where a cursor is needed.
 	firstBatch2, cursorID2 := cm.GetFirstBatch("test.collection", docs, 2)
 	if len(firstBatch2) != 2 {
 		t.Errorf("期望 2 个文档，实际 %d 个", len(firstBatch2))
@@ -196,6 +210,7 @@ func TestGetFirstBatch(t *testing.T) {
 	}
 
 	// 获取剩余文档
+	// EN: Fetch remaining documents.
 	remaining, hasMore, _ := cm.GetMore(cursorID2, 10)
 	if len(remaining) != 1 {
 		t.Errorf("期望 1 个剩余文档，实际 %d 个", len(remaining))
@@ -212,11 +227,13 @@ func TestGetMoreCommandIntegration(t *testing.T) {
 	col, _ := db.Collection("test")
 
 	// 插入 20 个文档
+	// EN: Insert 20 documents.
 	for i := 0; i < 20; i++ {
 		col.Insert(bson.D{{Key: "index", Value: i}})
 	}
 
 	// 使用 batchSize=5 执行 find
+	// EN: Run find with batchSize=5.
 	cmd := bson.D{
 		{Key: "find", Value: "test"},
 		{Key: "filter", Value: bson.D{}},
@@ -242,6 +259,7 @@ func TestGetMoreCommandIntegration(t *testing.T) {
 	}
 
 	// 使用 getMore 获取更多
+	// EN: Use getMore to fetch more.
 	getMoreCmd := bson.D{
 		{Key: "getMore", Value: cursorID},
 		{Key: "collection", Value: "test"},
@@ -261,6 +279,7 @@ func TestGetMoreCommandIntegration(t *testing.T) {
 	}
 
 	// 继续获取剩余 5 个
+	// EN: Continue to fetch the remaining 5.
 	cursorID2 := getDocField(cursor2, "id").(int64)
 	getMoreCmd2 := bson.D{
 		{Key: "getMore", Value: cursorID2},
@@ -292,11 +311,13 @@ func TestKillCursorsCommand(t *testing.T) {
 	col, _ := db.Collection("test")
 
 	// 插入文档
+	// EN: Insert documents.
 	for i := 0; i < 10; i++ {
 		col.Insert(bson.D{{Key: "index", Value: i}})
 	}
 
 	// 创建游标
+	// EN: Create a cursor.
 	cmd := bson.D{
 		{Key: "find", Value: "test"},
 		{Key: "filter", Value: bson.D{}},
@@ -312,6 +333,7 @@ func TestKillCursorsCommand(t *testing.T) {
 	}
 
 	// 关闭游标
+	// EN: Kill the cursor.
 	killCmd := bson.D{
 		{Key: "killCursors", Value: "test"},
 		{Key: "cursors", Value: bson.A{cursorID}},
@@ -333,6 +355,7 @@ func TestKillCursorsCommand(t *testing.T) {
 	}
 
 	// 尝试再次获取应该失败
+	// EN: Trying to fetch again should fail.
 	getMoreCmd := bson.D{
 		{Key: "getMore", Value: cursorID},
 		{Key: "collection", Value: "test"},

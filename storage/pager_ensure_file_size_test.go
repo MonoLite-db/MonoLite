@@ -13,6 +13,7 @@ func TestPagerRecovery_EnsureFileSizeRepairsTruncatedTail(t *testing.T) {
 	dbPath := filepath.Join(tmpDir, "truncate_tail.db")
 
 	// 1) 创建数据库并分配一页（会写 WAL，并更新 header.PageCount）
+	// EN: 1) Create a database and allocate a page (writes WAL and updates header.PageCount).
 	p1, err := OpenPagerWithWAL(dbPath, true)
 	if err != nil {
 		t.Fatalf("OpenPagerWithWAL failed: %v", err)
@@ -30,12 +31,14 @@ func TestPagerRecovery_EnsureFileSizeRepairsTruncatedTail(t *testing.T) {
 	}
 
 	// 2) 模拟“尾部半页/短写”：把数据文件截断到一个非页对齐的大小
+	// EN: 2) Simulate a partial tail/short write: truncate the file to a non-page-aligned size.
 	truncatedSize := expectedSize - 100
 	if err := p1.file.Truncate(truncatedSize); err != nil {
 		t.Fatalf("failed to truncate db file: %v", err)
 	}
 
 	// 3) 模拟崩溃：绕过 Flush/Close，直接关 fd（WAL 在 AllocatePage 中已 Sync，因此日志应可用于恢复）
+	// EN: 3) Simulate a crash: bypass Flush/Close and close the FD directly (WAL is synced in AllocatePage, so recovery should work).
 	if p1.wal != nil && p1.wal.file != nil {
 		_ = p1.wal.file.Close()
 	}
@@ -44,6 +47,7 @@ func TestPagerRecovery_EnsureFileSizeRepairsTruncatedTail(t *testing.T) {
 	}
 
 	// 4) 重启：recover() 应调用 ensureFileSize() 修复尾部短写，使页可被正常读取
+	// EN: 4) Restart: recover() should call ensureFileSize() to repair the truncated tail so the page can be read.
 	p2, err := OpenPagerWithWAL(dbPath, true)
 	if err != nil {
 		t.Fatalf("reopen failed: %v", err)
@@ -66,5 +70,3 @@ func TestPagerRecovery_EnsureFileSizeRepairsTruncatedTail(t *testing.T) {
 		t.Fatalf("recovered page type mismatch: got=%d want=%d", page.Type(), PageTypeIndex)
 	}
 }
-
-

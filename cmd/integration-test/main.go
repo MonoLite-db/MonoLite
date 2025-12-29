@@ -1,6 +1,7 @@
 // Created by Yanjunhui
 //
 // 集成测试：使用 MongoDB 官方驱动测试 MonoDB 兼容性
+// EN: Integration test: validate MonoDB compatibility using the official MongoDB driver.
 
 package main
 
@@ -46,6 +47,7 @@ func main() {
 	db = client.Database("integration_test")
 
 	// 运行测试
+	// EN: Run test cases.
 	runTest("Ping", testPing)
 	runTest("Insert One", testInsertOne)
 	runTest("Insert Many", testInsertMany)
@@ -69,6 +71,7 @@ func main() {
 	runTest("Drop Collection", testDropCollection)
 
 	// 输出结果
+	// EN: Print summary.
 	fmt.Printf("\n========================================\n")
 	fmt.Printf("测试结果: %d 通过, %d 失败\n", testsPassed, testsFailed)
 
@@ -199,6 +202,7 @@ func testFindWithFilter(ctx context.Context) error {
 	col.InsertMany(ctx, docs)
 
 	// 测试 $gt
+	// EN: Test $gt.
 	cursor, err := col.Find(ctx, bson.D{{Key: "score", Value: bson.D{{Key: "$gt", Value: 80}}}})
 	if err != nil {
 		return err
@@ -241,6 +245,7 @@ func testFindWithSort(ctx context.Context) error {
 	}
 
 	// 验证升序
+	// EN: Verify ascending order.
 	for i := 0; i < len(results)-1; i++ {
 		if results[i]["n"].(int32) > results[i+1]["n"].(int32) {
 			return fmt.Errorf("排序不正确")
@@ -275,6 +280,7 @@ func testFindWithLimitSkip(ctx context.Context) error {
 	}
 
 	// 第一条应该是 i=2
+	// EN: The first result should be i=2.
 	if results[0]["i"].(int32) != 2 {
 		return fmt.Errorf("Skip 后第一条应该是 i=2, 实际 i=%v", results[0]["i"])
 	}
@@ -558,7 +564,7 @@ func testCreateIndex(ctx context.Context) error {
 	col.Drop(ctx)
 
 	indexModel := mongo.IndexModel{
-		Keys: bson.D{{Key: "email", Value: 1}},
+		Keys:    bson.D{{Key: "email", Value: 1}},
 		Options: options.Index().SetUnique(true),
 	}
 
@@ -575,6 +581,7 @@ func testListIndexes(ctx context.Context) error {
 	col.Drop(ctx)
 
 	// 插入数据确保集合存在
+	// EN: Insert a document to ensure the collection exists.
 	col.InsertOne(ctx, bson.D{{Key: "x", Value: 1}})
 
 	cursor, err := col.Indexes().List(ctx)
@@ -587,6 +594,7 @@ func testListIndexes(ctx context.Context) error {
 	cursor.All(ctx, &indexes)
 
 	// 至少应该有 _id 索引
+	// EN: At least the _id index should exist.
 	if len(indexes) < 1 {
 		return fmt.Errorf("期望至少 1 个索引")
 	}
@@ -604,6 +612,7 @@ func testDropCollection(ctx context.Context) error {
 	}
 
 	// 验证集合已删除
+	// EN: Verify the collection is deleted.
 	count, _ := col.CountDocuments(ctx, bson.D{})
 	if count != 0 {
 		return fmt.Errorf("删除后集合应该为空")
@@ -613,4 +622,5 @@ func testDropCollection(ctx context.Context) error {
 }
 
 // 辅助类型
+// EN: Helper types.
 var _ = primitive.ObjectID{}

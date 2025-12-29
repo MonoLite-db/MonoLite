@@ -10,16 +10,19 @@ import (
 )
 
 // OpQueryMessage 表示旧版 OP_QUERY 消息（已废弃但仍用于握手）
+// EN: OpQueryMessage represents the legacy OP_QUERY message (deprecated, still used for handshake compatibility).
 type OpQueryMessage struct {
-	Flags              int32
-	FullCollectionName string
-	NumberToSkip       int32
-	NumberToReturn     int32
-	Query              bson.D
+	Flags                int32
+	FullCollectionName   string
+	NumberToSkip         int32
+	NumberToReturn       int32
+	Query                bson.D
 	ReturnFieldsSelector bson.D // 可选
+	// EN: Optional.
 }
 
 // ParseOpQuery 解析 OP_QUERY 消息体
+// EN: ParseOpQuery parses an OP_QUERY message body.
 func ParseOpQuery(body []byte) (*OpQueryMessage, error) {
 	if len(body) < 12 {
 		return nil, fmt.Errorf("OP_QUERY body too short: %d", len(body))
@@ -32,6 +35,7 @@ func ParseOpQuery(body []byte) (*OpQueryMessage, error) {
 	pos := 4
 
 	// 读取 fullCollectionName（C 字符串）
+	// EN: Read fullCollectionName (C-string).
 	nameEnd := pos
 	for nameEnd < len(body) && body[nameEnd] != 0 {
 		nameEnd++
@@ -43,6 +47,7 @@ func ParseOpQuery(body []byte) (*OpQueryMessage, error) {
 	pos = nameEnd + 1
 
 	// 读取 numberToSkip 和 numberToReturn
+	// EN: Read numberToSkip and numberToReturn.
 	if pos+8 > len(body) {
 		return nil, fmt.Errorf("OP_QUERY missing skip/return fields")
 	}
@@ -52,6 +57,7 @@ func ParseOpQuery(body []byte) (*OpQueryMessage, error) {
 	pos += 4
 
 	// 读取查询文档
+	// EN: Read the query document.
 	if pos+4 > len(body) {
 		return nil, fmt.Errorf("OP_QUERY missing query document")
 	}
@@ -66,11 +72,13 @@ func ParseOpQuery(body []byte) (*OpQueryMessage, error) {
 	pos += docLen
 
 	// 可选：读取 returnFieldsSelector
+	// EN: Optional: read returnFieldsSelector.
 	if pos < len(body) && pos+4 <= len(body) {
 		selectorLen := int(binary.LittleEndian.Uint32(body[pos:]))
 		if pos+selectorLen <= len(body) {
 			if err := bson.Unmarshal(body[pos:pos+selectorLen], &q.ReturnFieldsSelector); err == nil {
 				// 忽略解析错误
+				// EN: Ignore parse errors.
 			}
 		}
 	}
@@ -79,6 +87,7 @@ func ParseOpQuery(body []byte) (*OpQueryMessage, error) {
 }
 
 // OpReplyMsg 表示 OP_REPLY 响应消息
+// EN: OpReplyMsg represents an OP_REPLY response.
 type OpReplyMsg struct {
 	ResponseFlags  int32
 	CursorID       int64
@@ -88,8 +97,10 @@ type OpReplyMsg struct {
 }
 
 // BuildOpReply 构建 OP_REPLY 响应
+// EN: BuildOpReply builds an OP_REPLY response message.
 func BuildOpReply(requestID int32, docs []bson.D) (*Message, error) {
 	// 序列化所有文档
+	// EN: Marshal all documents.
 	var docBytes []byte
 	for _, doc := range docs {
 		b, err := bson.Marshal(doc)
@@ -100,7 +111,10 @@ func BuildOpReply(requestID int32, docs []bson.D) (*Message, error) {
 	}
 
 	// OP_REPLY 结构：
+	// EN: OP_REPLY layout:
 	// responseFlags (4) + cursorID (8) + startingFrom (4) + numberReturned (4) + documents
+	// EN: OP_REPLY layout:
+	// EN: responseFlags (4) + cursorID (8) + startingFrom (4) + numberReturned (4) + documents
 	bodyLen := 4 + 8 + 4 + 4 + len(docBytes)
 	body := make([]byte, bodyLen)
 
@@ -125,6 +139,7 @@ func BuildOpReply(requestID int32, docs []bson.D) (*Message, error) {
 	copy(body[pos:], docBytes)
 
 	// 构建消息头
+	// EN: Build the message header.
 	msgLen := int32(HeaderSize + bodyLen)
 	header := &MsgHeader{
 		MessageLength: msgLen,

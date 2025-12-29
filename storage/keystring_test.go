@@ -31,12 +31,14 @@ func TestKeyStringNumberOrdering(t *testing.T) {
 		builder.Reset()
 		builder.AppendValue(n)
 		// 复制字节切片
+		// EN: Copy the byte slice.
 		keyCopy := make([]byte, len(builder.Bytes()))
 		copy(keyCopy, builder.Bytes())
 		keys = append(keys, keyCopy)
 	}
 
 	// 验证顺序
+	// EN: Verify ordering.
 	for i := 1; i < len(keys); i++ {
 		if CompareKeyStrings(keys[i-1], keys[i]) >= 0 {
 			t.Errorf("Number ordering failed: %f should be < %f", numbers[i-1], numbers[i])
@@ -68,6 +70,7 @@ func TestKeyStringStringOrdering(t *testing.T) {
 	}
 
 	// 验证顺序
+	// EN: Verify ordering.
 	for i := 1; i < len(keys); i++ {
 		if CompareKeyStrings(keys[i-1], keys[i]) >= 0 {
 			t.Errorf("String ordering failed: %s should be < %s", strings[i-1], strings[i])
@@ -107,6 +110,7 @@ func TestKeyStringTypeOrdering(t *testing.T) {
 	}
 
 	// 验证类型优先级顺序
+	// EN: Verify type precedence ordering.
 	for i := 1; i < len(keys); i++ {
 		if CompareKeyStrings(keys[i-1], keys[i]) >= 0 {
 			t.Errorf("Type ordering failed at index %d", i)
@@ -132,6 +136,7 @@ func TestKeyStringDescending(t *testing.T) {
 	}
 
 	// 升序应该保持原顺序
+	// EN: Ascending should keep the original order.
 	for i := 1; i < len(ascending); i++ {
 		if CompareKeyStrings(ascending[i-1], ascending[i]) >= 0 {
 			t.Errorf("Ascending order failed at index %d", i)
@@ -139,6 +144,7 @@ func TestKeyStringDescending(t *testing.T) {
 	}
 
 	// 降序应该是反向顺序
+	// EN: Descending should be the reverse order.
 	for i := 1; i < len(descending); i++ {
 		if CompareKeyStrings(descending[i-1], descending[i]) <= 0 {
 			t.Errorf("Descending order failed at index %d", i)
@@ -148,6 +154,7 @@ func TestKeyStringDescending(t *testing.T) {
 
 func TestKeyStringCompoundKey(t *testing.T) {
 	// 复合索引：{name: 1, age: -1}
+	// EN: Compound index: {name: 1, age: -1}.
 	keys := bson.D{
 		{Key: "name", Value: 1},
 		{Key: "age", Value: -1},
@@ -167,6 +174,7 @@ func TestKeyStringCompoundKey(t *testing.T) {
 	}
 
 	// 预期顺序（name 升序，相同 name 时 age 降序）
+	// EN: Expected order (name ascending; for equal name, age descending).
 	// alice(30) < alice(25) < alice(20) < bob(30) < bob(25)
 	for i := 1; i < len(encodedKeys); i++ {
 		if CompareKeyStrings(encodedKeys[i-1], encodedKeys[i]) >= 0 {
@@ -190,6 +198,7 @@ func TestKeyStringNestedField(t *testing.T) {
 	}
 
 	// 验证顺序
+	// EN: Verify ordering.
 	for i := 1; i < len(encodedKeys); i++ {
 		if CompareKeyStrings(encodedKeys[i-1], encodedKeys[i]) >= 0 {
 			t.Errorf("Nested field ordering failed at index %d", i)
@@ -201,6 +210,7 @@ func TestKeyStringEquality(t *testing.T) {
 	builder := NewKeyStringBuilder()
 
 	// 相同值应该产生相同的 KeyString
+	// EN: The same value should produce the same KeyString.
 	builder.AppendValue("test")
 	key1 := append([]byte{}, builder.Bytes()...)
 
@@ -213,6 +223,7 @@ func TestKeyStringEquality(t *testing.T) {
 	}
 
 	// 不同值应该产生不同的 KeyString
+	// EN: Different values should produce different KeyStrings.
 	builder.Reset()
 	builder.AppendValue("other")
 	key3 := builder.Bytes()
@@ -226,6 +237,7 @@ func TestKeyStringNullHandling(t *testing.T) {
 	builder := NewKeyStringBuilder()
 
 	// 字符串中包含 null 字节
+	// EN: Strings containing null bytes.
 	builder.AppendValue("hello\x00world")
 	key1 := append([]byte{}, builder.Bytes()...)
 
@@ -238,6 +250,7 @@ func TestKeyStringNullHandling(t *testing.T) {
 	}
 
 	// 不同的 null 位置应该产生不同的键
+	// EN: Different null byte positions should produce different keys.
 	builder.Reset()
 	builder.AppendValue("hello\x00\x00world")
 	key3 := builder.Bytes()
@@ -312,12 +325,14 @@ func TestEncodeIndexKeyMissingField(t *testing.T) {
 	doc := bson.D{{Key: "name", Value: "test"}}
 
 	// 缺失字段应该编码为 null
+	// EN: Missing fields should be encoded as null.
 	encoded := EncodeIndexKey(keys, doc)
 	if len(encoded) == 0 {
 		t.Error("Missing field should produce a valid KeyString")
 	}
 
 	// 比较两个缺失相同字段的文档
+	// EN: Compare two documents missing the same field.
 	doc2 := bson.D{{Key: "other", Value: "test"}}
 	encoded2 := EncodeIndexKey(keys, doc2)
 
@@ -325,4 +340,3 @@ func TestEncodeIndexKeyMissingField(t *testing.T) {
 		t.Error("Documents with same missing field should produce equal KeyStrings")
 	}
 }
-

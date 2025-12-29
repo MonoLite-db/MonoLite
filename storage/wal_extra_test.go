@@ -57,6 +57,7 @@ func TestWALTruncateAfterCheckpointLockedAndSetAutoTruncate(t *testing.T) {
 	defer w.Close()
 
 	// 写几条记录，确保 WAL 文件大于 header
+	// EN: Write a few records to ensure the WAL file is larger than the header.
 	for i := 0; i < 5; i++ {
 		if _, err := w.WriteAllocRecord(PageId(i+1), PageTypeData); err != nil {
 			t.Fatalf("WriteAllocRecord failed: %v", err)
@@ -75,12 +76,14 @@ func TestWALTruncateAfterCheckpointLockedAndSetAutoTruncate(t *testing.T) {
 	}
 
 	// 覆盖 SetAutoTruncate（本测试不强制触发阈值分支，只覆盖该函数本身）
+	// EN: Cover SetAutoTruncate (this test doesn't force the threshold branch; it only covers the function itself).
 	w.SetAutoTruncate(true)
 	if !w.autoTruncate {
 		t.Fatalf("expected autoTruncate to be enabled")
 	}
 
 	// 覆盖 truncateAfterCheckpointLocked（按注释要求：调用者需要持有锁）
+	// EN: Cover truncateAfterCheckpointLocked (per contract: caller must hold the lock).
 	beforeCurrent := w.currentLSN
 	beforeCheckpoint := w.checkpointLSN
 
@@ -102,10 +105,9 @@ func TestWALTruncateAfterCheckpointLockedAndSetAutoTruncate(t *testing.T) {
 		t.Fatalf("unexpected offsets after truncate: writeOffset=%d fileSize=%d", w.writeOffset, w.header.FileSize)
 	}
 	// 语义要求：currentLSN/checkpointLSN 不变
+	// EN: Semantics: currentLSN/checkpointLSN must remain unchanged.
 	if w.currentLSN != beforeCurrent || w.checkpointLSN != beforeCheckpoint {
 		t.Fatalf("lsn changed unexpectedly: current %d->%d checkpoint %d->%d",
 			beforeCurrent, w.currentLSN, beforeCheckpoint, w.checkpointLSN)
 	}
 }
-
-

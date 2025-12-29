@@ -17,6 +17,7 @@ import (
 )
 
 // Database 表示一个数据库实例
+// EN: Database represents a database instance.
 type Database struct {
 	name           string
 	pager          *storage.Pager
@@ -29,6 +30,7 @@ type Database struct {
 }
 
 // OpenDatabase 打开或创建数据库
+// EN: OpenDatabase opens or creates a database.
 func OpenDatabase(path string) (*Database, error) {
 	pager, err := storage.OpenPager(path)
 	if err != nil {
@@ -42,14 +44,17 @@ func OpenDatabase(path string) (*Database, error) {
 		cursorManager: NewCursorManager(),
 		startTime:     time.Now(),
 	}
-	
+
 	// 初始化事务管理器
+	// EN: Initialize transaction manager.
 	db.txnManager = NewTransactionManager(db)
-	
+
 	// 初始化会话管理器
+	// EN: Initialize session manager.
 	db.sessionManager = NewSessionManager(db)
 
 	// 加载目录
+	// EN: Load catalog.
 	if err := db.loadCatalog(); err != nil {
 		pager.Close()
 		return nil, err
@@ -59,12 +64,16 @@ func OpenDatabase(path string) (*Database, error) {
 }
 
 // Name 返回数据库名称
+// EN: Name returns the database name.
 func (db *Database) Name() string {
 	return db.name
 }
 
 // GetCollection 只获取集合，不创建
+// EN: GetCollection returns a collection without creating it.
+//
 // 用于读操作（如 find），避免隐式创建集合（MongoDB 行为）
+// EN: Used for read operations (e.g., find) to avoid implicit creation (MongoDB behavior).
 func (db *Database) GetCollection(name string) *Collection {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
@@ -72,8 +81,10 @@ func (db *Database) GetCollection(name string) *Collection {
 }
 
 // Collection 获取或创建集合
+// EN: Collection gets or creates a collection.
 func (db *Database) Collection(name string) (*Collection, error) {
 	// 验证集合名
+	// EN: Validate collection name.
 	if err := ValidateCollectionName(name); err != nil {
 		return nil, err
 	}
@@ -86,10 +97,12 @@ func (db *Database) Collection(name string) (*Collection, error) {
 	db.mu.RUnlock()
 
 	// 创建新集合
+	// EN: Create new collection.
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
 	// 双重检查
+	// EN: Double-check.
 	if col, ok := db.collections[name]; ok {
 		return col, nil
 	}
@@ -110,6 +123,7 @@ func (db *Database) Collection(name string) (*Collection, error) {
 	db.collections[name] = col
 
 	// 保存目录（已持有 db.mu.Lock()，使用 Locked 版本）
+	// EN: Persist catalog (db.mu is held; use Locked variant).
 	if err := db.saveCatalogLocked(); err != nil {
 		delete(db.collections, name)
 		return nil, err
@@ -119,16 +133,20 @@ func (db *Database) Collection(name string) (*Collection, error) {
 }
 
 // DropCollection 删除集合
+// EN: DropCollection drops a collection.
 func (db *Database) DropCollection(name string) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
 	col, ok := db.collections[name]
 	if !ok {
-		return nil // 集合不存在，视为成功
+		// 集合不存在，视为成功
+		// EN: Collection does not exist; treat as success.
+		return nil
 	}
 
 	// 释放所有数据页
+	// EN: Free all data pages.
 	currentPageId := col.info.FirstPageId
 	for currentPageId != 0 {
 		page, err := db.pager.ReadPage(currentPageId)
@@ -143,10 +161,12 @@ func (db *Database) DropCollection(name string) error {
 	delete(db.collections, name)
 
 	// 已持有 db.mu.Lock()，使用 Locked 版本
+	// EN: db.mu.Lock is held; use Locked variant.
 	return db.saveCatalogLocked()
 }
 
 // ListCollections 列出所有集合名称
+// EN: ListCollections lists all collection names.
 func (db *Database) ListCollections() []string {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
@@ -159,21 +179,24 @@ func (db *Database) ListCollections() []string {
 }
 
 // catalogData catalog 持久化数据结构
+// EN: catalogData is the persisted catalog structure.
 type catalogData struct {
 	Collections []collectionData `bson:"collections"`
 }
 
 // collectionData 集合持久化数据
+// EN: collectionData is persisted collection data.
 type collectionData struct {
-	Name          string             `bson:"name"`
-	FirstPageId   uint32             `bson:"firstPageId"`
-	LastPageId    uint32             `bson:"lastPageId"`
-	DocumentCount int64              `bson:"documentCount"`
-	IndexPageId   uint32             `bson:"indexPageId"`
-	Indexes       []indexMetaBSON    `bson:"indexes,omitempty"`
+	Name          string          `bson:"name"`
+	FirstPageId   uint32          `bson:"firstPageId"`
+	LastPageId    uint32          `bson:"lastPageId"`
+	DocumentCount int64           `bson:"documentCount"`
+	IndexPageId   uint32          `bson:"indexPageId"`
+	Indexes       []indexMetaBSON `bson:"indexes,omitempty"`
 }
 
 // indexMetaBSON 索引元数据 BSON 格式
+// EN: indexMetaBSON is index metadata in BSON form.
 type indexMetaBSON struct {
 	Name       string `bson:"name"`
 	Keys       bson.D `bson:"keys"`
@@ -182,10 +205,13 @@ type indexMetaBSON struct {
 }
 
 // loadCatalog 加载集合目录
+// EN: loadCatalog loads the catalog.
 func (db *Database) loadCatalog() error {
 	catalogPageId := db.pager.CatalogPageId()
 	if catalogPageId == 0 {
-		return nil // 空数据库
+		// 空数据库
+		// EN: Empty database.
+		return nil
 	}
 
 	page, err := db.pager.ReadPage(catalogPageId)
@@ -194,30 +220,37 @@ func (db *Database) loadCatalog() error {
 	}
 
 	data := page.Data()
-	
+
 	// 检查数据是否有效（至少有最小长度）
+	// EN: Validate data (at least minimal length).
 	if len(data) < 5 {
 		return nil
 	}
 
 	// 检查是否是多页格式（通过 magic number）
+	// EN: Detect multi-page format by magic number.
 	magic := binary.LittleEndian.Uint32(data[0:4])
 	if magic == catalogMagic {
 		// 多页格式
+		// EN: Multi-page format.
 		return db.loadCatalogMultiPage(page, data)
 	}
 
 	// 获取 BSON 文档长度（单页格式）
+	// EN: Get BSON document length (single-page format).
 	bsonLen := binary.LittleEndian.Uint32(data[0:4])
 	if bsonLen < 5 || int(bsonLen) > len(data) {
 		// 尝试使用旧格式加载（向后兼容）
+		// EN: Try legacy format for backward compatibility.
 		return db.loadCatalogLegacy(data)
 	}
 
 	// 反序列化 BSON 格式的 catalog
+	// EN: Unmarshal BSON-form catalog.
 	var catalog catalogData
 	if err := bson.Unmarshal(data[:bsonLen], &catalog); err != nil {
 		// 尝试使用旧格式加载
+		// EN: Try legacy format.
 		return db.loadCatalogLegacy(data)
 	}
 
@@ -225,8 +258,10 @@ func (db *Database) loadCatalog() error {
 }
 
 // loadCatalogMultiPage 加载多页 catalog
+// EN: loadCatalogMultiPage loads a multi-page catalog.
 func (db *Database) loadCatalogMultiPage(firstPage *storage.Page, firstData []byte) error {
 	// 解析头信息
+	// EN: Parse header.
 	if len(firstData) < catalogHeaderLen {
 		return fmt.Errorf("invalid multi-page catalog header")
 	}
@@ -239,9 +274,11 @@ func (db *Database) loadCatalogMultiPage(firstPage *storage.Page, firstData []by
 	}
 
 	// 读取所有数据
+	// EN: Read all data.
 	bsonData := make([]byte, 0, totalLen)
-	
+
 	// 第一页数据
+	// EN: Data from the first page.
 	firstPageDataCap := storage.MaxPageData - catalogHeaderLen
 	if int(totalLen) <= firstPageDataCap {
 		bsonData = append(bsonData, firstData[catalogHeaderLen:catalogHeaderLen+int(totalLen)]...)
@@ -250,6 +287,7 @@ func (db *Database) loadCatalogMultiPage(firstPage *storage.Page, firstData []by
 	}
 
 	// 读取后续页面
+	// EN: Read subsequent pages.
 	currentPageId := firstPage.NextPageId()
 	for len(bsonData) < int(totalLen) && currentPageId != 0 {
 		page, err := db.pager.ReadPage(currentPageId)
@@ -272,6 +310,7 @@ func (db *Database) loadCatalogMultiPage(firstPage *storage.Page, firstData []by
 	}
 
 	// 反序列化
+	// EN: Unmarshal.
 	var catalog catalogData
 	if err := bson.Unmarshal(bsonData, &catalog); err != nil {
 		return fmt.Errorf("failed to unmarshal multi-page catalog: %w", err)
@@ -281,6 +320,7 @@ func (db *Database) loadCatalogMultiPage(firstPage *storage.Page, firstData []by
 }
 
 // restoreCollectionsFromCatalog 从 catalog 数据恢复集合
+// EN: restoreCollectionsFromCatalog restores collections from catalog data.
 func (db *Database) restoreCollectionsFromCatalog(catalog *catalogData) error {
 	for _, colData := range catalog.Collections {
 		info := &CollectionInfo{
@@ -293,6 +333,7 @@ func (db *Database) restoreCollectionsFromCatalog(catalog *catalogData) error {
 		}
 
 		// 恢复索引元数据
+		// EN: Restore index metadata.
 		for _, idxData := range colData.Indexes {
 			info.Indexes = append(info.Indexes, IndexMeta{
 				Name:       idxData.Name,
@@ -309,6 +350,7 @@ func (db *Database) restoreCollectionsFromCatalog(catalog *catalogData) error {
 		db.collections[colData.Name] = col
 
 		// 如果有索引，恢复索引管理器
+		// EN: If indexes exist, restore index manager.
 		if len(info.Indexes) > 0 {
 			col.restoreIndexes()
 		}
@@ -318,10 +360,12 @@ func (db *Database) restoreCollectionsFromCatalog(catalog *catalogData) error {
 }
 
 // loadCatalogLegacy 加载旧格式的 catalog（向后兼容）
+// EN: loadCatalogLegacy loads legacy catalog format (backward compatible).
 func (db *Database) loadCatalogLegacy(data []byte) error {
 	pos := 0
 
 	// 读取集合数量
+	// EN: Read collection count.
 	if len(data) < 4 {
 		return nil
 	}
@@ -329,12 +373,14 @@ func (db *Database) loadCatalogLegacy(data []byte) error {
 	pos += 4
 
 	// 校验 count 是否合理（避免损坏数据导致无限循环）
+	// EN: Validate count to avoid infinite loops on corrupted data.
 	if count < 0 || count > 10000 {
 		return nil
 	}
 
 	for i := 0; i < count && pos < len(data); i++ {
 		// 读取集合名称长度
+		// EN: Read collection name length.
 		if pos+2 > len(data) {
 			break
 		}
@@ -342,11 +388,13 @@ func (db *Database) loadCatalogLegacy(data []byte) error {
 		pos += 2
 
 		// 校验名称长度
+		// EN: Validate name length.
 		if nameLen < 0 || nameLen > 1000 {
 			break
 		}
 
 		// 读取集合名称
+		// EN: Read collection name.
 		if pos+nameLen > len(data) {
 			break
 		}
@@ -354,6 +402,7 @@ func (db *Database) loadCatalogLegacy(data []byte) error {
 		pos += nameLen
 
 		// 读取集合元信息 (24 bytes)
+		// EN: Read collection metadata (24 bytes).
 		if pos+24 > len(data) {
 			break
 		}
@@ -376,7 +425,10 @@ func (db *Database) loadCatalogLegacy(data []byte) error {
 }
 
 // saveCatalog 保存集合目录（会获取读锁）
+// EN: saveCatalog persists the catalog (acquires read lock).
+//
 // 用于 Collection 方法调用（它们不持有 db.mu）
+// EN: Used by Collection methods (they do not hold db.mu).
 func (db *Database) saveCatalog() error {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
@@ -384,16 +436,23 @@ func (db *Database) saveCatalog() error {
 }
 
 // catalogMultiPageHeader 多页 catalog 的头信息
+// EN: catalogMultiPageHeader is the header for multi-page catalog.
+//
 // 存储在第一页的开头
+// EN: Stored at the beginning of the first page.
 const (
-	catalogMagic     uint32 = 0x4D504354 // "MPCT" = Multi-Page Catalog
-	catalogHeaderLen = 12                // magic(4) + totalLen(4) + pageCount(4)
+	catalogMagic     = 0x4D504354 // "MPCT" = Multi-Page Catalog
+	catalogHeaderLen = 12         // magic(4) + totalLen(4) + pageCount(4)
 )
 
 // saveCatalogLocked 保存集合目录（调用者必须持有 db.mu 锁）
+// EN: saveCatalogLocked persists the catalog (caller must hold db.mu).
+//
 // 使用 BSON 格式存储，支持多页存储和索引元数据持久化
+// EN: Stores in BSON format, supports multi-page storage and persisted index metadata.
 func (db *Database) saveCatalogLocked() error {
 	// 构建 catalog 数据
+	// EN: Build catalog data.
 	catalog := catalogData{
 		Collections: make([]collectionData, 0, len(db.collections)),
 	}
@@ -409,6 +468,7 @@ func (db *Database) saveCatalogLocked() error {
 		}
 
 		// 收集索引元数据
+		// EN: Collect index metadata.
 		if col.indexManager != nil {
 			for _, idx := range col.indexManager.indexes {
 				colData.Indexes = append(colData.Indexes, indexMetaBSON{
@@ -420,8 +480,10 @@ func (db *Database) saveCatalogLocked() error {
 			}
 		}
 		// 也包含 CollectionInfo 中已持久化的索引（尚未加载到 indexManager 的）
+		// EN: Also include persisted indexes in CollectionInfo (not yet loaded into indexManager).
 		for _, idxMeta := range col.info.Indexes {
 			// 检查是否已经在 indexManager 中
+			// EN: Check whether it is already in indexManager.
 			alreadyInManager := false
 			if col.indexManager != nil {
 				if _, exists := col.indexManager.indexes[idxMeta.Name]; exists {
@@ -442,22 +504,27 @@ func (db *Database) saveCatalogLocked() error {
 	}
 
 	// 序列化为 BSON
+	// EN: Marshal to BSON.
 	bsonData, err := bson.Marshal(catalog)
 	if err != nil {
 		return fmt.Errorf("failed to marshal catalog: %w", err)
 	}
 
 	// 检查是否需要多页存储
+	// EN: Check whether multi-page storage is needed.
 	if len(bsonData) <= storage.MaxPageData {
 		// 单页存储（向后兼容）
+		// EN: Single-page storage (backward compatible).
 		return db.saveCatalogSinglePage(bsonData)
 	}
 
 	// 多页存储
+	// EN: Multi-page storage.
 	return db.saveCatalogMultiPage(bsonData)
 }
 
 // saveCatalogSinglePage 单页存储 catalog
+// EN: saveCatalogSinglePage persists catalog in a single page.
 func (db *Database) saveCatalogSinglePage(data []byte) error {
 	catalogPageId := db.pager.CatalogPageId()
 	var page *storage.Page
@@ -475,6 +542,7 @@ func (db *Database) saveCatalogSinglePage(data []byte) error {
 			return err
 		}
 		// 清理可能存在的后续页面（从多页切换到单页的情况）
+		// EN: Clean up possible trailing pages (when switching from multi-page to single-page).
 		db.freeCatalogChain(page.NextPageId())
 		page.SetNextPageId(0)
 	}
@@ -485,10 +553,14 @@ func (db *Database) saveCatalogSinglePage(data []byte) error {
 }
 
 // saveCatalogMultiPage 多页存储 catalog
+// EN: saveCatalogMultiPage persists catalog in multiple pages.
 func (db *Database) saveCatalogMultiPage(bsonData []byte) error {
 	// 计算需要的页数
+	// EN: Compute number of pages needed.
 	// 第一页：header + 数据
+	// EN: First page: header + data.
 	// 后续页：纯数据
+	// EN: Subsequent pages: data only.
 	firstPageDataCap := storage.MaxPageData - catalogHeaderLen
 	subsequentPageCap := storage.MaxPageData
 
@@ -499,12 +571,14 @@ func (db *Database) saveCatalogMultiPage(bsonData []byte) error {
 	}
 
 	// 准备多页头信息
+	// EN: Prepare multi-page header.
 	header := make([]byte, catalogHeaderLen)
 	binary.LittleEndian.PutUint32(header[0:4], catalogMagic)
 	binary.LittleEndian.PutUint32(header[4:8], uint32(len(bsonData)))
 	binary.LittleEndian.PutUint32(header[8:12], uint32(pagesNeeded))
 
 	// 获取或分配第一页
+	// EN: Get or allocate first page.
 	catalogPageId := db.pager.CatalogPageId()
 	var firstPage *storage.Page
 	var err error
@@ -523,6 +597,7 @@ func (db *Database) saveCatalogMultiPage(bsonData []byte) error {
 	}
 
 	// 写入第一页：header + 部分数据
+	// EN: Write first page: header + partial data.
 	firstPageData := make([]byte, storage.MaxPageData)
 	copy(firstPageData[0:], header)
 	dataForFirstPage := bsonData
@@ -535,17 +610,20 @@ func (db *Database) saveCatalogMultiPage(bsonData []byte) error {
 	db.pager.MarkDirty(firstPage.ID())
 
 	// 写入后续页面
+	// EN: Write subsequent pages.
 	dataOffset := len(dataForFirstPage)
 	currentPage := firstPage
 	existingNextId := currentPage.NextPageId()
 
 	for dataOffset < len(bsonData) {
 		// 获取或分配下一页
+		// EN: Get or allocate next page.
 		var nextPage *storage.Page
 		if existingNextId != 0 {
 			nextPage, err = db.pager.ReadPage(existingNextId)
 			if err != nil {
 				// 分配新页
+				// EN: Allocate a new page.
 				nextPage, err = db.pager.AllocatePage(storage.PageTypeCatalog)
 				if err != nil {
 					return err
@@ -560,10 +638,12 @@ func (db *Database) saveCatalogMultiPage(bsonData []byte) error {
 		}
 
 		// 链接页面
+		// EN: Link pages.
 		currentPage.SetNextPageId(nextPage.ID())
 		db.pager.MarkDirty(currentPage.ID())
 
 		// 写入数据
+		// EN: Write data.
 		endOffset := dataOffset + subsequentPageCap
 		if endOffset > len(bsonData) {
 			endOffset = len(bsonData)
@@ -579,6 +659,7 @@ func (db *Database) saveCatalogMultiPage(bsonData []byte) error {
 	}
 
 	// 清理多余的旧页面
+	// EN: Clean up extra old pages.
 	currentPage.SetNextPageId(0)
 	db.pager.MarkDirty(currentPage.ID())
 	db.freeCatalogChain(existingNextId)
@@ -587,6 +668,7 @@ func (db *Database) saveCatalogMultiPage(bsonData []byte) error {
 }
 
 // freeCatalogChain 释放 catalog 页面链
+// EN: freeCatalogChain frees a catalog page chain.
 func (db *Database) freeCatalogChain(startPageId storage.PageId) {
 	currentId := startPageId
 	for currentId != 0 {
@@ -601,11 +683,13 @@ func (db *Database) freeCatalogChain(startPageId storage.PageId) {
 }
 
 // Flush 将所有更改写入磁盘
+// EN: Flush writes all changes to disk.
 func (db *Database) Flush() error {
 	return db.pager.Flush()
 }
 
 // Close 关闭数据库
+// EN: Close closes the database.
 func (db *Database) Close() error {
 	if db.cursorManager != nil {
 		db.cursorManager.Stop()
@@ -617,6 +701,7 @@ func (db *Database) Close() error {
 }
 
 // Stats 返回数据库统计信息
+// EN: Stats returns database statistics.
 func (db *Database) Stats() *DatabaseStats {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
@@ -640,6 +725,7 @@ func (db *Database) Stats() *DatabaseStats {
 }
 
 // DatabaseStats 数据库统计信息
+// EN: DatabaseStats holds database statistics.
 type DatabaseStats struct {
 	CollectionCount int
 	DocumentCount   int64
@@ -648,13 +734,16 @@ type DatabaseStats struct {
 }
 
 // CollectionStats 集合统计信息
+// EN: CollectionStats holds per-collection statistics.
 type CollectionStats struct {
 	DocumentCount int64
 }
 
 // RunCommand 执行数据库命令（兼容 MongoDB 命令格式）
+// EN: RunCommand executes a database command (MongoDB-compatible command format).
 func (db *Database) RunCommand(cmd bson.D) (bson.D, error) {
 	// 解析命令
+	// EN: Parse command.
 	for _, elem := range cmd {
 		switch elem.Key {
 		case "ping":
@@ -750,6 +839,7 @@ func (db *Database) RunCommand(cmd bson.D) (bson.D, error) {
 	}
 
 	// 获取第一个命令名（用于错误消息）
+	// EN: Get the first command name (for error messages).
 	cmdName := ""
 	if len(cmd) > 0 {
 		cmdName = cmd[0].Key
@@ -758,12 +848,18 @@ func (db *Database) RunCommand(cmd bson.D) (bson.D, error) {
 }
 
 // isMasterCommand 返回服务器信息（MongoDB 兼容）
+// EN: isMasterCommand returns server information (MongoDB-compatible).
 //
 // 能力宣称策略：
+// EN: Capability advertisement policy:
 // - maxWireVersion=13 (MongoDB 5.0)：保守宣称，不支持 6.0+ 新特性
+// EN: - maxWireVersion=13 (MongoDB 5.0): conservative advertisement; no 6.0+ features.
 // - 不宣称 compression（OP_COMPRESSED 未实现）
+// EN: - No compression is advertised (OP_COMPRESSED is not implemented).
 // - 宣称 logicalSessionTimeoutMinutes（支持会话）
+// EN: - logicalSessionTimeoutMinutes is advertised (sessions supported).
 // - 宣称 readOnly=false（支持写入）
+// EN: - readOnly=false is advertised (writes supported).
 func (db *Database) isMasterCommand() bson.D {
 	return bson.D{
 		{Key: "ismaster", Value: true},
@@ -772,38 +868,49 @@ func (db *Database) isMasterCommand() bson.D {
 		{Key: "maxWriteBatchSize", Value: int32(100000)},
 		{Key: "localTime", Value: primitive.NewDateTimeFromTime(time.Now())},
 		// Wire Protocol 版本：13 = MongoDB 5.0，保守宣称避免触发不支持的特性
+		// EN: Wire protocol version: 13 = MongoDB 5.0; conservatively advertised to avoid unsupported features.
 		{Key: "minWireVersion", Value: int32(0)},
 		{Key: "maxWireVersion", Value: int32(13)},
 		// 会话支持：逻辑会话超时 30 分钟
+		// EN: Session support: logical session timeout is 30 minutes.
 		{Key: "logicalSessionTimeoutMinutes", Value: int32(30)},
 		// 不宣称 compression（未实现 OP_COMPRESSED）
+		// EN: Do not advertise compression (OP_COMPRESSED is not implemented).
 		// {Key: "compression", Value: bson.A{}},
 		// 单机模式，不宣称副本集相关字段
+		// EN: Standalone mode; replica set fields are not advertised.
 		{Key: "readOnly", Value: false},
 		{Key: "ok", Value: int32(1)},
 	}
 }
 
 // helloCommand 返回服务器信息（MongoDB 5.0+ 推荐命令）
+// EN: helloCommand returns server information (recommended command for MongoDB 5.0+).
 //
 // 与 isMaster 类似，但使用 isWritablePrimary 代替 ismaster
+// EN: Similar to isMaster, but uses isWritablePrimary instead of ismaster.
 func (db *Database) helloCommand() bson.D {
 	return bson.D{
 		{Key: "isWritablePrimary", Value: true},
 		// 为了兼容旧驱动，同时返回 ismaster
+		// EN: For compatibility with old drivers, also return ismaster.
 		{Key: "ismaster", Value: true},
 		{Key: "maxBsonObjectSize", Value: int32(16 * 1024 * 1024)},
 		{Key: "maxMessageSizeBytes", Value: int32(48 * 1024 * 1024)},
 		{Key: "maxWriteBatchSize", Value: int32(100000)},
 		{Key: "localTime", Value: primitive.NewDateTimeFromTime(time.Now())},
 		// Wire Protocol 版本
+		// EN: Wire protocol version.
 		{Key: "minWireVersion", Value: int32(0)},
 		{Key: "maxWireVersion", Value: int32(13)},
 		// 会话支持
+		// EN: Session support.
 		{Key: "logicalSessionTimeoutMinutes", Value: int32(30)},
 		// 不宣称 compression
+		// EN: Do not advertise compression.
 		{Key: "readOnly", Value: false},
 		// hello 命令特有字段
+		// EN: Fields specific to hello.
 		{Key: "helloOk", Value: true},
 		{Key: "ok", Value: int32(1)},
 	}
@@ -854,6 +961,7 @@ func (db *Database) insertCommand(cmd bson.D) (bson.D, error) {
 	}
 
 	// 提取会话和事务上下文
+	// EN: Extract session and transaction context.
 	var cmdCtx *CommandContext
 	if db.sessionManager != nil {
 		var err error
@@ -876,12 +984,14 @@ func (db *Database) insertCommand(cmd bson.D) (bson.D, error) {
 	}
 
 	// 如果在事务中，记录 undo 日志
+	// EN: If inside a transaction, prepare undo information.
 	insertedIDs, err := col.Insert(docs...)
 	if err != nil {
 		return ErrorResponse(err), nil
 	}
 
 	// 在事务中记录操作（用于回滚）
+	// EN: Record operations in the transaction (for rollback).
 	if cmdCtx != nil && cmdCtx.IsInTransaction() {
 		for i, id := range insertedIDs {
 			cmdCtx.RecordOperationInTxn("insert", colName, id, docs[i])
@@ -948,11 +1058,13 @@ func (db *Database) findCommand(cmd bson.D) (bson.D, error) {
 	}
 
 	// 使用 GetCollection 避免隐式创建集合（MongoDB 行为：find 不创建集合）
+	// EN: Use GetCollection to avoid implicit creation (MongoDB behavior: find does not create collections).
 	col := db.GetCollection(colName)
 	var docs []bson.D
 	var err error
 
 	// 如果集合不存在，返回空结果
+	// EN: If the collection does not exist, return an empty result.
 	if col == nil {
 		docs = []bson.D{}
 	} else if opts.Sort != nil || opts.Limit > 0 || opts.Skip > 0 || opts.Projection != nil {
@@ -965,12 +1077,14 @@ func (db *Database) findCommand(cmd bson.D) (bson.D, error) {
 	}
 
 	// 构建 namespace
+	// EN: Build namespace.
 	ns := colName
 	if dbName != "" {
 		ns = dbName + "." + colName
 	}
 
 	// 使用游标管理器处理分批返回
+	// EN: Use cursor manager to return results in batches.
 	firstBatch, cursorID := db.cursorManager.GetFirstBatch(ns, docs, batchSize)
 
 	arr := bson.A{}
@@ -1006,6 +1120,7 @@ func (db *Database) updateCommand(cmd bson.D) (bson.D, error) {
 	}
 
 	// 提取会话和事务上下文
+	// EN: Extract session and transaction context.
 	var cmdCtx *CommandContext
 	if db.sessionManager != nil {
 		var err error
@@ -1016,6 +1131,7 @@ func (db *Database) updateCommand(cmd bson.D) (bson.D, error) {
 	}
 
 	// 检查是否有任何 upsert:true
+	// EN: Check whether any update has upsert:true.
 	hasUpsert := false
 	for _, updateVal := range updates {
 		if updateDoc, ok := updateVal.(bson.D); ok {
@@ -1034,16 +1150,20 @@ func (db *Database) updateCommand(cmd bson.D) (bson.D, error) {
 	}
 
 	// 根据是否有 upsert 决定获取集合的方式
+	// EN: Choose how to fetch the collection depending on whether upsert is present.
 	var col *Collection
 	var err error
 	if hasUpsert {
 		// 有 upsert 时可能需要创建集合
+		// EN: With upsert we may need to create the collection.
 		col, err = db.Collection(colName)
 	} else {
 		// 无 upsert 时不应创建集合
+		// EN: Without upsert we must not create the collection.
 		col = db.GetCollection(colName)
 		if col == nil {
 			// 集合不存在，返回空结果（非 upsert 更新不存在的集合 = 0 条匹配）
+			// EN: Collection does not exist; return empty result (non-upsert update on missing collection matches 0).
 			return bson.D{
 				{Key: "n", Value: int64(0)},
 				{Key: "nModified", Value: int64(0)},
@@ -1079,6 +1199,7 @@ func (db *Database) updateCommand(cmd bson.D) (bson.D, error) {
 		}
 
 		// 如果在事务中，先获取原始文档用于 undo
+		// EN: If in a transaction, fetch original documents first for undo.
 		var oldDocs []bson.D
 		if cmdCtx != nil && cmdCtx.IsInTransaction() {
 			oldDocs, _ = col.Find(filter)
@@ -1090,8 +1211,10 @@ func (db *Database) updateCommand(cmd bson.D) (bson.D, error) {
 		}
 
 		// 在事务中记录 undo（用于回滚）
+		// EN: Record undo information in the transaction (for rollback).
 		if cmdCtx != nil && cmdCtx.IsInTransaction() {
 			// 记录被更新的原始文档
+			// EN: Record original documents that were updated.
 			for _, oldDoc := range oldDocs {
 				docID := getDocField(oldDoc, "_id")
 				if docID != nil {
@@ -1099,6 +1222,7 @@ func (db *Database) updateCommand(cmd bson.D) (bson.D, error) {
 				}
 			}
 			// 如果是 upsert 产生的新文档，记录为 insert（回滚时删除）
+			// EN: If upsert inserted a new document, record it as an insert (delete on rollback).
 			if result.UpsertedCount > 0 && result.UpsertedID != nil {
 				cmdCtx.RecordOperationInTxn("insert", colName, result.UpsertedID, nil)
 			}
@@ -1108,12 +1232,14 @@ func (db *Database) updateCommand(cmd bson.D) (bson.D, error) {
 		totalModified += result.ModifiedCount
 
 		// 收集 upserted 信息
+		// EN: Collect upserted information.
 		if result.UpsertedCount > 0 && result.UpsertedID != nil {
 			upsertedDocs = append(upsertedDocs, bson.D{
 				{Key: "index", Value: int32(idx)},
 				{Key: "_id", Value: result.UpsertedID},
 			})
 			// upsert 时 n 需要计入
+			// EN: For upsert, n must include the inserted document.
 			totalMatched += result.UpsertedCount
 		}
 	}
@@ -1124,6 +1250,7 @@ func (db *Database) updateCommand(cmd bson.D) (bson.D, error) {
 	}
 
 	// 添加 upserted 数组（如果有）
+	// EN: Add upserted array (if present).
 	if len(upsertedDocs) > 0 {
 		response = append(response, bson.E{Key: "upserted", Value: upsertedDocs})
 	}
@@ -1151,6 +1278,7 @@ func (db *Database) deleteCommand(cmd bson.D) (bson.D, error) {
 	}
 
 	// 提取会话和事务上下文
+	// EN: Extract session and transaction context.
 	var cmdCtx *CommandContext
 	if db.sessionManager != nil {
 		var err error
@@ -1161,9 +1289,11 @@ func (db *Database) deleteCommand(cmd bson.D) (bson.D, error) {
 	}
 
 	// delete 不应该隐式创建集合
+	// EN: delete must not implicitly create collections.
 	col := db.GetCollection(colName)
 	if col == nil {
 		// 集合不存在，返回 0 条删除
+		// EN: Collection does not exist; return 0 deletions.
 		return bson.D{
 			{Key: "n", Value: int64(0)},
 			{Key: "ok", Value: int32(1)},
@@ -1200,6 +1330,7 @@ func (db *Database) deleteCommand(cmd bson.D) (bson.D, error) {
 		}
 
 		// 如果在事务中，先获取要删除的文档用于 undo
+		// EN: If in a transaction, fetch documents to delete first for undo.
 		var docsToDelete []bson.D
 		if cmdCtx != nil && cmdCtx.IsInTransaction() {
 			if limit == 1 {
@@ -1223,6 +1354,7 @@ func (db *Database) deleteCommand(cmd bson.D) (bson.D, error) {
 		}
 
 		// 在事务中记录 undo（用于回滚）
+		// EN: Record undo information in the transaction (for rollback).
 		if cmdCtx != nil && cmdCtx.IsInTransaction() {
 			for _, doc := range docsToDelete {
 				docID := getDocField(doc, "_id")
@@ -1259,9 +1391,11 @@ func (db *Database) countCommand(cmd bson.D) (bson.D, error) {
 	}
 
 	// count 不应该隐式创建集合
+	// EN: count must not implicitly create collections.
 	col := db.GetCollection(colName)
 	if col == nil {
 		// 集合不存在，返回 0
+		// EN: Collection does not exist; return 0.
 		return bson.D{
 			{Key: "n", Value: int64(0)},
 			{Key: "ok", Value: int32(1)},
@@ -1270,6 +1404,7 @@ func (db *Database) countCommand(cmd bson.D) (bson.D, error) {
 
 	if len(query) == 0 {
 		// 快速路径：返回总数
+		// EN: Fast path: return total count.
 		return bson.D{
 			{Key: "n", Value: col.Count()},
 			{Key: "ok", Value: int32(1)},
@@ -1277,6 +1412,7 @@ func (db *Database) countCommand(cmd bson.D) (bson.D, error) {
 	}
 
 	// 带过滤器的计数
+	// EN: Count with a filter.
 	docs, err := col.Find(query)
 	if err != nil {
 		return ErrorResponse(err), nil
@@ -1309,12 +1445,15 @@ func (db *Database) dropCommand(cmd bson.D) (bson.D, error) {
 }
 
 // Pager 返回底层的 Pager（供 Wire Protocol 使用）
+// EN: Pager returns the underlying Pager (used by the wire protocol layer).
 func (db *Database) Pager() *storage.Pager {
 	return db.pager
 }
 
 // InsertRaw 直接插入原始 BSON 数据（供 Wire Protocol 使用）
+// EN: InsertRaw inserts raw BSON documents directly (used by the wire protocol layer).
 // 返回插入文档的 _id 列表（支持任意类型）
+// EN: Returns the _id list of inserted documents (supports any BSON type).
 func (c *Collection) InsertRaw(docs [][]byte) ([]interface{}, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -1334,6 +1473,7 @@ func (c *Collection) InsertRaw(docs [][]byte) ([]interface{}, error) {
 		ids = append(ids, id)
 
 		// 重新序列化（因为可能添加了 _id）
+		// EN: Re-marshal because we may have added _id.
 		newData, err := bson.Marshal(doc)
 		if err != nil {
 			return nil, err
@@ -1354,6 +1494,7 @@ func (c *Collection) InsertRaw(docs [][]byte) ([]interface{}, error) {
 }
 
 // createIndexesCommand 创建索引命令
+// EN: createIndexesCommand handles the createIndexes command.
 func (db *Database) createIndexesCommand(cmd bson.D) (bson.D, error) {
 	var colName string
 	var indexes bson.A
@@ -1405,6 +1546,7 @@ func (db *Database) createIndexesCommand(cmd bson.D) (bson.D, error) {
 		}
 
 		// 验证索引键
+		// EN: Validate index keys.
 		if err := ValidateIndexKeys(keys); err != nil {
 			return AsMongoError(err).ToBSON(), nil
 		}
@@ -1426,6 +1568,7 @@ func (db *Database) createIndexesCommand(cmd bson.D) (bson.D, error) {
 }
 
 // listIndexesCommand 列出索引命令
+// EN: listIndexesCommand handles the listIndexes command.
 func (db *Database) listIndexesCommand(cmd bson.D) (bson.D, error) {
 	var colName string
 	var dbName string
@@ -1455,6 +1598,7 @@ func (db *Database) listIndexesCommand(cmd bson.D) (bson.D, error) {
 	indexes := col.ListIndexes()
 
 	// 构建 namespace
+	// EN: Build namespace.
 	ns := colName
 	if dbName != "" {
 		ns = dbName + "." + colName
@@ -1471,6 +1615,7 @@ func (db *Database) listIndexesCommand(cmd bson.D) (bson.D, error) {
 }
 
 // dropIndexesCommand 删除索引命令
+// EN: dropIndexesCommand handles the dropIndexes command.
 func (db *Database) dropIndexesCommand(cmd bson.D) (bson.D, error) {
 	var colName string
 	var indexName interface{}
@@ -1497,10 +1642,12 @@ func (db *Database) dropIndexesCommand(cmd bson.D) (bson.D, error) {
 	}
 
 	// 处理不同类型的 index 参数
+	// EN: Handle different types of the "index" parameter.
 	switch idx := indexName.(type) {
 	case string:
 		if idx == "*" {
 			// 删除所有索引（除了 _id）
+			// EN: Drop all indexes except _id.
 			indexes := col.ListIndexes()
 			for _, idxInfo := range indexes {
 				if idxDoc, ok := idxInfo.(bson.D); ok {
@@ -1527,6 +1674,7 @@ func (db *Database) dropIndexesCommand(cmd bson.D) (bson.D, error) {
 }
 
 // aggregateCommand 聚合命令
+// EN: aggregateCommand handles the aggregate command.
 func (db *Database) aggregateCommand(cmd bson.D) (bson.D, error) {
 	var colName string
 	var dbName string
@@ -1548,9 +1696,11 @@ func (db *Database) aggregateCommand(cmd bson.D) (bson.D, error) {
 	}
 
 	// 使用 GetCollection 避免隐式创建集合（MongoDB 行为：aggregate 不创建集合）
+	// EN: Use GetCollection to avoid implicit creation (MongoDB behavior: aggregate does not create collections).
 	col := db.GetCollection(colName)
 
 	// 转换 pipeline
+	// EN: Convert pipeline.
 	stages := make([]bson.D, 0, len(pipeline))
 	for _, stage := range pipeline {
 		if stageDoc, ok := stage.(bson.D); ok {
@@ -1562,6 +1712,7 @@ func (db *Database) aggregateCommand(cmd bson.D) (bson.D, error) {
 	var err error
 
 	// 如果集合不存在，返回空结果
+	// EN: If the collection does not exist, return an empty result.
 	if col == nil {
 		docs = []bson.D{}
 	} else {
@@ -1572,12 +1723,14 @@ func (db *Database) aggregateCommand(cmd bson.D) (bson.D, error) {
 	}
 
 	// 构建结果
+	// EN: Build result.
 	arr := bson.A{}
 	for _, doc := range docs {
 		arr = append(arr, doc)
 	}
 
 	// 构建 namespace
+	// EN: Build namespace.
 	ns := colName
 	if dbName != "" {
 		ns = dbName + "." + colName
@@ -1594,12 +1747,18 @@ func (db *Database) aggregateCommand(cmd bson.D) (bson.D, error) {
 }
 
 // getMoreCommand 获取更多文档
+// EN: getMoreCommand fetches more documents for a cursor.
 //
 // MongoDB 兼容行为：
+// EN: MongoDB-compatible behavior:
 // - 必须提供 cursorId（非零）
+// EN: - cursorId must be provided (non-zero).
 // - 可选提供 batchSize 覆盖默认值
+// EN: - batchSize is optional and overrides the default.
 // - 如果 cursor 不存在，返回 CursorNotFound 错误（code: 43）
+// EN: - If the cursor does not exist, return CursorNotFound (code: 43).
 // - 返回 cursorId=0 表示已返回所有数据
+// EN: - Returning cursorId=0 indicates all results have been returned.
 func (db *Database) getMoreCommand(cmd bson.D) (bson.D, error) {
 	var cursorID int64
 	var colName string
@@ -1628,26 +1787,32 @@ func (db *Database) getMoreCommand(cmd bson.D) (bson.D, error) {
 	}
 
 	// 原子操作：获取下一批文档（同时检查存在性，避免竞态）
+	// EN: Atomic op: get next batch while checking existence to avoid races.
 	// 不再单独调用 GetCursor，直接在 GetMore 中检查
+	// EN: We don't call GetCursor separately; GetMore performs the check.
 	docs, hasMore, err := db.cursorManager.GetMore(cursorID, batchSize)
 	if err != nil {
 		return AsMongoError(err).ToBSON(), nil
 	}
 
 	// 构建结果
+	// EN: Build result.
 	arr := bson.A{}
 	for _, doc := range docs {
 		arr = append(arr, doc)
 	}
 
 	// 如果没有更多文档，返回 cursorID 为 0
+	// EN: If no more documents remain, return cursorID=0.
 	returnCursorID := int64(0)
 	if hasMore {
 		returnCursorID = cursorID
 	}
 
 	// 使用命令中提供的 collection 作为命名空间
+	// EN: Use "collection" from the command as the namespace.
 	// 如果未提供，使用数据库名
+	// EN: If not provided, use the database name.
 	ns := colName
 	if ns == "" {
 		ns = db.name
@@ -1664,11 +1829,16 @@ func (db *Database) getMoreCommand(cmd bson.D) (bson.D, error) {
 }
 
 // killCursorsCommand 关闭游标
+// EN: killCursorsCommand closes cursors.
 //
 // MongoDB 兼容行为：
+// EN: MongoDB-compatible behavior:
 // - 接收 cursor ID 数组
+// EN: - Accepts an array of cursor IDs.
 // - 返回 cursorsKilled/cursorsNotFound/cursorsAlive/cursorsUnknown 数组
+// EN: - Returns cursorsKilled/cursorsNotFound/cursorsAlive/cursorsUnknown arrays.
 // - 幂等操作：关闭不存在的 cursor 不报错，仅列入 cursorsNotFound
+// EN: - Idempotent: closing non-existent cursors is not an error; they appear in cursorsNotFound.
 func (db *Database) killCursorsCommand(cmd bson.D) (bson.D, error) {
 	var colName string
 	var cursorIDs []int64
@@ -1691,6 +1861,7 @@ func (db *Database) killCursorsCommand(cmd bson.D) (bson.D, error) {
 	killed := db.cursorManager.KillCursors(cursorIDs)
 
 	// 构建响应
+	// EN: Build response.
 	cursorsKilled := bson.A{}
 	cursorsNotFound := bson.A{}
 	cursorsAlive := bson.A{}
@@ -1709,6 +1880,7 @@ func (db *Database) killCursorsCommand(cmd bson.D) (bson.D, error) {
 	}
 
 	_ = colName // 暂未使用
+	// EN: Currently unused.
 
 	return bson.D{
 		{Key: "cursorsKilled", Value: cursorsKilled},
@@ -1720,11 +1892,13 @@ func (db *Database) killCursorsCommand(cmd bson.D) (bson.D, error) {
 }
 
 // CursorManager 返回游标管理器
+// EN: CursorManager returns the cursor manager.
 func (db *Database) CursorManager() *CursorManager {
 	return db.cursorManager
 }
 
 // findAndModifyCommand 查找并修改命令
+// EN: findAndModifyCommand handles the findAndModify command.
 func (db *Database) findAndModifyCommand(cmd bson.D) (bson.D, error) {
 	var colName string
 	opts := &FindAndModifyOptions{}
@@ -1753,19 +1927,23 @@ func (db *Database) findAndModifyCommand(cmd bson.D) (bson.D, error) {
 	}
 
 	// 根据是否有 upsert 决定获取集合的方式
+	// EN: Choose how to fetch the collection depending on whether upsert is present.
 	var col *Collection
 	var err error
 	if opts.Upsert {
 		// 有 upsert 时可能需要创建集合
+		// EN: With upsert we may need to create the collection.
 		col, err = db.Collection(colName)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		// 无 upsert 时不应创建集合
+		// EN: Without upsert we must not create the collection.
 		col = db.GetCollection(colName)
 		if col == nil {
 			// 集合不存在，返回空结果
+			// EN: Collection does not exist; return an empty result.
 			return bson.D{
 				{Key: "lastErrorObject", Value: bson.D{
 					{Key: "n", Value: int32(0)},
@@ -1800,6 +1978,7 @@ func (db *Database) findAndModifyCommand(cmd bson.D) (bson.D, error) {
 }
 
 // distinctCommand distinct 命令
+// EN: distinctCommand handles the distinct command.
 func (db *Database) distinctCommand(cmd bson.D) (bson.D, error) {
 	var colName string
 	var key string
@@ -1849,6 +2028,7 @@ func (db *Database) distinctCommand(cmd bson.D) (bson.D, error) {
 }
 
 // dbStatsCommand 数据库统计命令
+// EN: dbStatsCommand handles the dbStats command.
 func (db *Database) dbStatsCommand(cmd bson.D) (bson.D, error) {
 	stats := db.Stats()
 
@@ -1867,6 +2047,7 @@ func (db *Database) dbStatsCommand(cmd bson.D) (bson.D, error) {
 }
 
 // collStatsCommand 集合统计命令
+// EN: collStatsCommand handles the collStats command.
 func (db *Database) collStatsCommand(cmd bson.D) (bson.D, error) {
 	var colName string
 
@@ -1902,27 +2083,30 @@ func (db *Database) collStatsCommand(cmd bson.D) (bson.D, error) {
 }
 
 // serverStatusCommand 返回服务器状态信息
+// EN: serverStatusCommand returns server status information.
 func (db *Database) serverStatusCommand() bson.D {
 	// 收集统计信息
+	// EN: Collect statistics.
 	var totalDocs int64
 	var totalIndexes int
 	collections := db.ListCollections()
-	
+
 	for _, name := range collections {
 		if col := db.GetCollection(name); col != nil {
 			totalDocs += col.Count()
 			totalIndexes += len(col.ListIndexes())
 		}
 	}
-	
+
 	// 获取存储信息
+	// EN: Get storage information.
 	var pageCount uint32
 	var freePageCount int
 	if db.pager != nil {
 		pageCount = db.pager.GetPageCount()
 		freePageCount = db.pager.GetFreePageCount()
 	}
-	
+
 	return bson.D{
 		{Key: "host", Value: "localhost"},
 		{Key: "version", Value: "0.1.0"},
@@ -1948,21 +2132,23 @@ func (db *Database) serverStatusCommand() bson.D {
 }
 
 // getMemoryStats 获取内存统计信息
+// EN: getMemoryStats returns memory statistics.
 func (db *Database) getMemoryStats() bson.D {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	
+
 	return bson.D{
-		{Key: "resident", Value: int64(m.Sys / 1024 / 1024)},       // MB
-		{Key: "virtual", Value: int64(m.Sys / 1024 / 1024)},        // MB
-		{Key: "heap", Value: int64(m.HeapAlloc / 1024 / 1024)},     // MB
-		{Key: "heapInUse", Value: int64(m.HeapInuse / 1024 / 1024)}, // MB
+		{Key: "resident", Value: int64(m.Sys / 1024 / 1024)},          // MB
+		{Key: "virtual", Value: int64(m.Sys / 1024 / 1024)},           // MB
+		{Key: "heap", Value: int64(m.HeapAlloc / 1024 / 1024)},        // MB
+		{Key: "heapInUse", Value: int64(m.HeapInuse / 1024 / 1024)},   // MB
 		{Key: "stackInUse", Value: int64(m.StackInuse / 1024 / 1024)}, // MB
 		{Key: "gcPauses", Value: int64(m.NumGC)},
 	}
 }
 
 // connectionStatsCommand 返回连接统计
+// EN: connectionStatsCommand returns connection statistics.
 func (db *Database) connectionStatsCommand() bson.D {
 	return bson.D{
 		{Key: "current", Value: int32(1)},
@@ -1973,41 +2159,57 @@ func (db *Database) connectionStatsCommand() bson.D {
 }
 
 // startTransactionCommand 开始事务
+// EN: startTransactionCommand starts a transaction.
 //
 // DEPRECATED: MongoDB 标准中，事务通过 CRUD 命令中的字段来启动，而非独立命令：
+// EN: DEPRECATED: In MongoDB, transactions are started via fields in CRUD commands, not a standalone command.
 //   - startTransaction: true（标记事务的第一个命令）
+//
+// EN:   - startTransaction: true (marks the first command of a transaction).
 //   - lsid: {id: UUID}（会话标识）
+//
+// EN:   - lsid: {id: UUID} (session identifier).
 //   - txnNumber: int（事务序号）
+//
+// EN:   - txnNumber: int (transaction number).
 //   - autocommit: false（多文档事务必须为 false）
 //
+// EN:   - autocommit: false (must be false for multi-document transactions).
+//
 // 此命令保留仅用于内部测试和旧版兼容。官方驱动应使用标准字段方式启动事务。
+// EN: This command is kept only for internal tests and legacy compatibility; official drivers should use the standard fields.
 func (db *Database) startTransactionCommand(cmd bson.D) (bson.D, error) {
 	if db.sessionManager == nil {
 		return nil, ErrInternalError("session manager not initialized")
 	}
-	
+
 	// 尝试从命令中提取会话上下文
+	// EN: Try to extract session context from the command.
 	ctx, err := db.sessionManager.ExtractCommandContext(cmd)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// 如果有 lsid，使用标准的会话事务
+	// EN: If lsid is present, use standard session-based transactions.
 	if ctx.Session != nil {
 		// 事务已在 ExtractCommandContext 中启动（如果有 startTransaction: true）
+		// EN: The transaction is started in ExtractCommandContext (when startTransaction: true is present).
 		return bson.D{
 			{Key: "ok", Value: int32(1)},
 		}, nil
 	}
-	
+
 	// DEPRECATED: 旧格式兼容路径（无 lsid，使用底层事务管理器）
+	// EN: DEPRECATED: Legacy compatibility path (no lsid; uses the low-level transaction manager).
 	// 此路径仅用于内部测试，不应对外暴露
+	// EN: This path is only for internal tests and should not be exposed externally.
 	if db.txnManager == nil {
 		return nil, ErrInternalError("transaction manager not initialized")
 	}
-	
+
 	txn := db.txnManager.Begin()
-	
+
 	return bson.D{
 		{Key: "txnId", Value: int64(txn.ID)},
 		{Key: "ok", Value: int32(1)},
@@ -2015,18 +2217,26 @@ func (db *Database) startTransactionCommand(cmd bson.D) (bson.D, error) {
 }
 
 // commitTransactionCommand 提交事务
+// EN: commitTransactionCommand commits a transaction.
 //
 // MongoDB 标准格式：
+// EN: MongoDB standard format:
 //   - lsid: {id: UUID}
 //   - txnNumber: int
 //
 // DEPRECATED: txnId 格式仅用于内部测试和旧版兼容，不应对外暴露。
+// EN: DEPRECATED: The txnId format is only for internal tests and legacy compatibility and should not be exposed externally.
 func (db *Database) commitTransactionCommand(cmd bson.D) (bson.D, error) {
 	// 提取 lsid
+	// EN: Extract lsid.
 	var lsid bson.D
-	var txnID int64     // DEPRECATED: 旧格式
-	var txnNumber int64 // MongoDB 标准格式
-	
+	// txnID 旧格式（DEPRECATED）
+	// EN: txnID is the deprecated legacy format.
+	var txnID int64
+	// txnNumber MongoDB 标准格式
+	// EN: txnNumber is the MongoDB standard transaction number.
+	var txnNumber int64
+
 	for _, elem := range cmd {
 		switch elem.Key {
 		case "lsid":
@@ -2053,8 +2263,9 @@ func (db *Database) commitTransactionCommand(cmd bson.D) (bson.D, error) {
 			}
 		}
 	}
-	
+
 	// 优先使用 lsid（MongoDB 标准格式）
+	// EN: Prefer lsid (MongoDB standard format).
 	if lsid != nil && db.sessionManager != nil {
 		if txnNumber == 0 {
 			return nil, ErrBadValue("txnNumber is required for commitTransaction with lsid")
@@ -2063,52 +2274,61 @@ func (db *Database) commitTransactionCommand(cmd bson.D) (bson.D, error) {
 		if err != nil {
 			return nil, err
 		}
-		
+
 		if err := db.sessionManager.CommitTransaction(session, txnNumber); err != nil {
 			return AsMongoError(err).ToBSON(), nil
 		}
-		
+
 		return bson.D{
 			{Key: "ok", Value: int32(1)},
 		}, nil
 	}
-	
+
 	// DEPRECATED: 旧格式兼容路径（txnId）
+	// EN: DEPRECATED: Legacy compatibility path (txnId).
 	if db.txnManager == nil {
 		return nil, ErrInternalError("transaction manager not initialized")
 	}
-	
+
 	if txnID == 0 {
 		return nil, ErrBadValue("lsid or txnId is required")
 	}
-	
+
 	txn := db.txnManager.GetTransaction(TxnID(txnID))
 	if txn == nil {
 		return nil, NewMongoError(ErrorCodeNoSuchTransaction, "transaction not found")
 	}
-	
+
 	if err := db.txnManager.Commit(txn); err != nil {
 		return AsMongoError(err).ToBSON(), nil
 	}
-	
+
 	return bson.D{
 		{Key: "ok", Value: int32(1)},
 	}, nil
 }
 
 // abortTransactionCommand 中止事务
+// EN: abortTransactionCommand aborts a transaction.
 //
 // MongoDB 标准格式：
+// EN: MongoDB standard format:
 //   - lsid: {id: UUID}
 //   - txnNumber: int
 //
 // DEPRECATED: txnId 格式仅用于内部测试和旧版兼容，不应对外暴露。
+// EN: DEPRECATED: The txnId format is only for internal tests and legacy compatibility and should not be exposed externally.
 func (db *Database) abortTransactionCommand(cmd bson.D) (bson.D, error) {
 	// 提取 lsid
+	// EN: Extract lsid.
 	var lsid bson.D
-	var txnID int64     // DEPRECATED: 旧格式
-	var txnNumber int64 // MongoDB 标准格式
-	
+	// txnID 旧格式（DEPRECATED）
+	// EN: txnID is the deprecated legacy format.
+	var txnID int64
+	// txnNumber MongoDB 标准格式
+	// EN: txnNumber is the MongoDB standard transaction number.
+	var txnNumber int64
+
 	for _, elem := range cmd {
 		switch elem.Key {
 		case "lsid":
@@ -2135,8 +2355,9 @@ func (db *Database) abortTransactionCommand(cmd bson.D) (bson.D, error) {
 			}
 		}
 	}
-	
+
 	// 优先使用 lsid（MongoDB 标准格式）
+	// EN: Prefer lsid (MongoDB standard format).
 	if lsid != nil && db.sessionManager != nil {
 		if txnNumber == 0 {
 			return nil, ErrBadValue("txnNumber is required for abortTransaction with lsid")
@@ -2145,56 +2366,61 @@ func (db *Database) abortTransactionCommand(cmd bson.D) (bson.D, error) {
 		if err != nil {
 			return nil, err
 		}
-		
+
 		if err := db.sessionManager.AbortTransaction(session, txnNumber); err != nil {
 			return AsMongoError(err).ToBSON(), nil
 		}
-		
+
 		return bson.D{
 			{Key: "ok", Value: int32(1)},
 		}, nil
 	}
-	
+
 	// 兼容旧格式：使用 txnId
+	// EN: Legacy compatibility: use txnId.
 	if db.txnManager == nil {
 		return nil, ErrInternalError("transaction manager not initialized")
 	}
-	
+
 	if txnID == 0 {
 		return nil, ErrBadValue("lsid or txnId is required")
 	}
-	
+
 	txn := db.txnManager.GetTransaction(TxnID(txnID))
 	if txn == nil {
 		return nil, NewMongoError(ErrorCodeNoSuchTransaction, "transaction not found")
 	}
-	
+
 	if err := db.txnManager.Abort(txn); err != nil {
 		return AsMongoError(err).ToBSON(), nil
 	}
-	
+
 	return bson.D{
 		{Key: "ok", Value: int32(1)},
 	}, nil
 }
 
 // GetTransactionManager 获取事务管理器
+// EN: GetTransactionManager returns the transaction manager.
 func (db *Database) GetTransactionManager() *TransactionManager {
 	return db.txnManager
 }
 
 // GetSessionManager 获取会话管理器
+// EN: GetSessionManager returns the session manager.
 func (db *Database) GetSessionManager() *SessionManager {
 	return db.sessionManager
 }
 
 // endSessionsCommand 结束会话
+// EN: endSessionsCommand ends sessions.
 // 命令格式: { endSessions: [ { id: UUID }, ... ] }
+// EN: Command format: { endSessions: [ { id: UUID }, ... ] }.
 func (db *Database) endSessionsCommand(cmd bson.D) (bson.D, error) {
 	if db.sessionManager == nil {
 		return nil, ErrInternalError("session manager not initialized")
 	}
-	
+
 	var sessions bson.A
 	for _, elem := range cmd {
 		if elem.Key == "endSessions" {
@@ -2203,29 +2429,31 @@ func (db *Database) endSessionsCommand(cmd bson.D) (bson.D, error) {
 			}
 		}
 	}
-	
+
 	if sessions == nil {
 		return nil, ErrBadValue("endSessions requires an array of session ids")
 	}
-	
+
 	for _, s := range sessions {
 		if lsid, ok := s.(bson.D); ok {
 			_ = db.sessionManager.EndSession(lsid)
 		}
 	}
-	
+
 	return bson.D{
 		{Key: "ok", Value: int32(1)},
 	}, nil
 }
 
 // refreshSessionsCommand 刷新会话
+// EN: refreshSessionsCommand refreshes sessions.
 // 命令格式: { refreshSessions: [ { id: UUID }, ... ] }
+// EN: Command format: { refreshSessions: [ { id: UUID }, ... ] }.
 func (db *Database) refreshSessionsCommand(cmd bson.D) (bson.D, error) {
 	if db.sessionManager == nil {
 		return nil, ErrInternalError("session manager not initialized")
 	}
-	
+
 	var sessions bson.A
 	for _, elem := range cmd {
 		if elem.Key == "refreshSessions" {
@@ -2234,17 +2462,17 @@ func (db *Database) refreshSessionsCommand(cmd bson.D) (bson.D, error) {
 			}
 		}
 	}
-	
+
 	if sessions == nil {
 		return nil, ErrBadValue("refreshSessions requires an array of session ids")
 	}
-	
+
 	for _, s := range sessions {
 		if lsid, ok := s.(bson.D); ok {
 			_ = db.sessionManager.RefreshSession(lsid)
 		}
 	}
-	
+
 	return bson.D{
 		{Key: "ok", Value: int32(1)},
 	}, nil

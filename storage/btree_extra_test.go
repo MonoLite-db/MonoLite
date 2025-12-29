@@ -24,6 +24,7 @@ func TestRecordIdMarshalUnmarshalRoundtrip(t *testing.T) {
 
 func TestBTreeNodeNeedsSplitAndCanAccommodate(t *testing.T) {
 	// 构造一个“字节大小”接近阈值的叶子节点
+	// EN: Build a leaf node whose byte size is close to the split threshold.
 	n := &BTreeNode{
 		PageId:   1,
 		IsLeaf:   true,
@@ -38,11 +39,13 @@ func TestBTreeNodeNeedsSplitAndCanAccommodate(t *testing.T) {
 	val := bytes.Repeat([]byte("v"), 50)
 
 	// 先验证在空节点里 CanAccommodate 应该能放下
+	// EN: First verify an empty node can accommodate one entry.
 	if !n.CanAccommodate(key, val) {
 		t.Fatalf("expected empty node to accommodate one entry")
 	}
 
 	// 不断塞入直到 NeedsSplit 变为 true（上限给个保护，避免死循环）
+	// EN: Keep inserting until NeedsSplit becomes true (cap iterations to avoid infinite loops).
 	for i := 0; i < 1000 && !n.NeedsSplit(); i++ {
 		n.Keys = append(n.Keys, append([]byte(nil), key...))
 		n.Values = append(n.Values, append([]byte(nil), val...))
@@ -54,6 +57,7 @@ func TestBTreeNodeNeedsSplitAndCanAccommodate(t *testing.T) {
 	}
 
 	// NeedsSplit 为 true 时，再加同样的 entry 大概率无法容纳（至少应逼近上限）
+	// EN: When NeedsSplit is true, adding another similar entry likely cannot fit (at least it should be near the limit).
 	_ = n.CanAccommodate(key, val)
 }
 
@@ -97,6 +101,7 @@ func TestBTreeSearchRangeLimitSkip(t *testing.T) {
 	}
 
 	// 插入足够多的数据，确保会跨多个叶子节点（便于覆盖链表遍历）
+	// EN: Insert enough keys to span multiple leaf nodes (to cover leaf-chain traversal).
 	n := 300
 	for i := 0; i < n; i++ {
 		key := []byte(fmt.Sprintf("%05d", i))
@@ -107,6 +112,7 @@ func TestBTreeSearchRangeLimitSkip(t *testing.T) {
 	}
 
 	// limit<=0 分支
+	// EN: limit<=0 branch.
 	gotNil, err := tree.SearchRangeLimitSkip(10, 0)
 	if err != nil {
 		t.Fatalf("SearchRangeLimitSkip failed: %v", err)
@@ -132,5 +138,3 @@ func TestBTreeSearchRangeLimitSkip(t *testing.T) {
 		}
 	}
 }
-
-

@@ -18,6 +18,7 @@ func TestPagerCreateNew(t *testing.T) {
 	defer os.Remove(tmpPath)
 
 	// 创建新数据库
+	// EN: Create a new database.
 	pager, err := OpenPager(tmpPath)
 	if err != nil {
 		t.Fatalf("打开 Pager 失败: %v", err)
@@ -25,6 +26,7 @@ func TestPagerCreateNew(t *testing.T) {
 	defer pager.Close()
 
 	// 验证文件头
+	// EN: Verify file header.
 	if pager.header.Magic != MagicNumber {
 		t.Errorf("魔数错误: 期望 %x, 实际 %x", MagicNumber, pager.header.Magic)
 	}
@@ -57,6 +59,7 @@ func TestPagerAllocatePage(t *testing.T) {
 	initialCount := pager.PageCount()
 
 	// 分配新页面
+	// EN: Allocate a new page.
 	page, err := pager.AllocatePage(PageTypeData)
 	if err != nil {
 		t.Fatalf("分配页面失败: %v", err)
@@ -87,16 +90,19 @@ func TestPagerReadWritePage(t *testing.T) {
 	}
 
 	// 分配页面并写入数据
+	// EN: Allocate a page and write data.
 	page, _ := pager.AllocatePage(PageTypeData)
 	testData := []byte("Hello, MonoDB!")
 	page.SetData(testData)
 	pager.MarkDirty(page.ID())
 
 	// 刷新并关闭
+	// EN: Flush and close.
 	pager.Flush()
 	pager.Close()
 
 	// 重新打开并读取
+	// EN: Reopen and read.
 	pager2, err := OpenPager(tmpPath)
 	if err != nil {
 		t.Fatalf("重新打开 Pager 失败: %v", err)
@@ -137,6 +143,7 @@ func TestPagerFreePage(t *testing.T) {
 	defer pager.Close()
 
 	// 分配多个页面
+	// EN: Allocate multiple pages.
 	page1, _ := pager.AllocatePage(PageTypeData)
 	page2, _ := pager.AllocatePage(PageTypeData)
 	page3, _ := pager.AllocatePage(PageTypeData)
@@ -145,16 +152,20 @@ func TestPagerFreePage(t *testing.T) {
 	id2 := page2.ID()
 
 	// 释放页面
+	// EN: Free pages.
 	pager.FreePage(id1)
 	pager.FreePage(id2)
 
 	// 新分配的页面应该复用已释放的页面
+	// EN: Newly allocated pages should reuse freed pages.
 	newPage1, _ := pager.AllocatePage(PageTypeData)
 	newPage2, _ := pager.AllocatePage(PageTypeData)
 
 	// 验证复用
+	// EN: Verify reuse.
 	if newPage1.ID() != id2 && newPage1.ID() != id1 {
 		// 可能不复用，取决于实现
+		// EN: It may not reuse depending on the implementation.
 	}
 
 	_ = page3
@@ -166,6 +177,7 @@ func TestSlottedPage(t *testing.T) {
 	sp := WrapSlottedPage(page)
 
 	// 插入记录
+	// EN: Insert records.
 	record1 := []byte("record one")
 	slot1, err := sp.InsertRecord(record1)
 	if err != nil {
@@ -179,6 +191,7 @@ func TestSlottedPage(t *testing.T) {
 	}
 
 	// 读取记录
+	// EN: Read records.
 	read1, err := sp.GetRecord(slot1)
 	if err != nil {
 		t.Fatalf("读取记录失败: %v", err)
@@ -196,6 +209,7 @@ func TestSlottedPage(t *testing.T) {
 	}
 
 	// 更新记录
+	// EN: Update record.
 	newRecord := []byte("updated")
 	err = sp.UpdateRecord(slot1, newRecord)
 	if err != nil {
@@ -208,6 +222,7 @@ func TestSlottedPage(t *testing.T) {
 	}
 
 	// 删除记录
+	// EN: Delete record.
 	err = sp.DeleteRecord(slot1)
 	if err != nil {
 		t.Fatalf("删除记录失败: %v", err)
@@ -224,6 +239,7 @@ func TestPageLinkage(t *testing.T) {
 	page2 := NewPage(2, PageTypeData)
 
 	// 链接页面
+	// EN: Link pages.
 	page1.SetNextPageId(2)
 	page2.SetPrevPageId(1)
 
@@ -252,6 +268,7 @@ func TestCatalogPageId(t *testing.T) {
 	}
 
 	// 设置目录页 ID
+	// EN: Set catalog page ID.
 	pager.SetCatalogPageId(5)
 
 	if pager.CatalogPageId() != 5 {
@@ -259,10 +276,12 @@ func TestCatalogPageId(t *testing.T) {
 	}
 
 	// 刷新并关闭
+	// EN: Flush and close.
 	pager.Flush()
 	pager.Close()
 
 	// 重新打开验证持久化
+	// EN: Reopen to verify persistence.
 	pager2, err := OpenPager(tmpPath)
 	if err != nil {
 		t.Fatalf("重新打开 Pager 失败: %v", err)

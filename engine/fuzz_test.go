@@ -13,8 +13,10 @@ import (
 )
 
 // FuzzInsertDocument 模糊测试文档插入
+// EN: FuzzInsertDocument fuzz-tests document insertion.
 func FuzzInsertDocument(f *testing.F) {
 	// 添加种子语料
+	// EN: Add seed corpus.
 	f.Add([]byte(`{"name":"test","age":25}`))
 	f.Add([]byte(`{"_id":"custom","data":[1,2,3]}`))
 	f.Add([]byte(`{"nested":{"a":{"b":{"c":1}}}}`))
@@ -23,12 +25,16 @@ func FuzzInsertDocument(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		// 尝试解析 BSON
+		// EN: Try to parse BSON.
 		var doc bson.D
 		if err := bson.UnmarshalExtJSON(data, false, &doc); err != nil {
-			return // 无效输入，跳过
+			// 无效输入，跳过
+			// EN: Invalid input; skip.
+			return
 		}
 
 		// 创建临时数据库
+		// EN: Create a temporary database.
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "fuzz_test.db")
 		db, err := OpenDatabase(dbPath)
@@ -38,22 +44,30 @@ func FuzzInsertDocument(f *testing.F) {
 		defer db.Close()
 
 		// 获取集合
+		// EN: Get the collection.
 		col, err := db.Collection("fuzz_collection")
 		if err != nil {
-			return // 集合名无效
+			// 集合名无效
+			// EN: Invalid collection name.
+			return
 		}
 
 		// 尝试插入
+		// EN: Try to insert.
 		_, err = col.Insert(doc)
 		if err != nil {
 			// 验证返回的是 MongoError
+			// EN: Verify the returned error is a MongoError.
 			if !IsMongoError(err) {
 				// 如果不是预期的错误类型，检查是否是合理的错误
+				// EN: If it's not the expected error type, ensure it's still a reasonable error.
 				// 例如：文档过大、嵌套过深等
+				// EN: For example: document too large, nesting too deep, etc.
 			}
 		}
 
 		// 如果插入成功，尝试查询
+		// EN: If insert succeeded, try querying.
 		if err == nil {
 			docs, findErr := col.Find(bson.D{})
 			if findErr != nil {
@@ -67,8 +81,10 @@ func FuzzInsertDocument(f *testing.F) {
 }
 
 // FuzzQuery 模糊测试查询
+// EN: FuzzQuery fuzz-tests queries.
 func FuzzQuery(f *testing.F) {
 	// 添加查询种子
+	// EN: Add query seeds.
 	f.Add([]byte(`{"name":"test"}`))
 	f.Add([]byte(`{"age":{"$gt":18}}`))
 	f.Add([]byte(`{"$and":[{"a":1},{"b":2}]}`))
@@ -92,6 +108,7 @@ func FuzzQuery(f *testing.F) {
 		col, _ := db.Collection("test")
 
 		// 插入一些测试文档
+		// EN: Insert some test documents.
 		for i := 0; i < 10; i++ {
 			col.Insert(bson.D{
 				{Key: "name", Value: "test"},
@@ -101,11 +118,13 @@ func FuzzQuery(f *testing.F) {
 		}
 
 		// 执行查询（不应该崩溃）
+		// EN: Execute the query (should not crash).
 		_, _ = col.Find(filter)
 	})
 }
 
 // FuzzUpdate 模糊测试更新
+// EN: FuzzUpdate fuzz-tests updates.
 func FuzzUpdate(f *testing.F) {
 	f.Add([]byte(`{"$set":{"name":"updated"}}`))
 	f.Add([]byte(`{"$inc":{"count":1}}`))
@@ -130,11 +149,13 @@ func FuzzUpdate(f *testing.F) {
 		col.Insert(bson.D{{Key: "name", Value: "original"}})
 
 		// 执行更新（不应该崩溃）
+		// EN: Execute update (should not crash).
 		_, _ = col.Update(bson.D{}, update, false)
 	})
 }
 
 // TestRandomOperations 随机操作测试
+// EN: TestRandomOperations runs random operations.
 func TestRandomOperations(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "random_ops.db")
@@ -147,6 +168,7 @@ func TestRandomOperations(t *testing.T) {
 	col, _ := db.Collection("random_test")
 
 	// 执行大量随机操作
+	// EN: Execute many random operations.
 	insertedIds := make([]interface{}, 0)
 
 	for i := 0; i < 1000; i++ {
@@ -177,6 +199,7 @@ func TestRandomOperations(t *testing.T) {
 		case 3: // Delete
 			if len(insertedIds) > 0 && i%10 == 0 {
 				// 偶尔删除
+				// EN: Occasionally delete.
 				col.DeleteOne(bson.D{{Key: "_id", Value: insertedIds[0]}})
 				insertedIds = insertedIds[1:]
 			}
@@ -184,10 +207,12 @@ func TestRandomOperations(t *testing.T) {
 	}
 
 	// 验证数据一致性
+	// EN: Verify data consistency.
 	count := col.Count()
 	t.Logf("Final document count: %d", count)
 
 	// 关闭并重新打开验证持久化
+	// EN: Close and reopen to verify persistence.
 	if err := db.Close(); err != nil {
 		t.Fatalf("Failed to close database: %v", err)
 	}
@@ -209,6 +234,7 @@ func TestRandomOperations(t *testing.T) {
 }
 
 // TestEdgeCases 边界条件测试
+// EN: TestEdgeCases tests edge cases.
 func TestEdgeCases(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "edge_cases.db")
@@ -249,6 +275,7 @@ func TestEdgeCases(t *testing.T) {
 			}
 
 			// 尝试查找
+			// EN: Try to find.
 			doc, err := col.FindById(ids[0])
 			if err != nil {
 				t.Errorf("Failed to find %s: %v", tc.name, err)
@@ -262,6 +289,7 @@ func TestEdgeCases(t *testing.T) {
 }
 
 // TestConcurrentOperations 并发操作测试
+// EN: TestConcurrentOperations tests concurrent operations.
 func TestConcurrentOperations(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "concurrent.db")
@@ -277,6 +305,7 @@ func TestConcurrentOperations(t *testing.T) {
 	errors := make(chan error, 100)
 
 	// 启动多个 goroutine 并发操作
+	// EN: Start multiple goroutines to operate concurrently.
 	for g := 0; g < 10; g++ {
 		go func(gid int) {
 			for i := 0; i < 100; i++ {
@@ -293,17 +322,20 @@ func TestConcurrentOperations(t *testing.T) {
 	}
 
 	// 等待所有 goroutine 完成
+	// EN: Wait for all goroutines to finish.
 	for i := 0; i < 10; i++ {
 		<-done
 	}
 
 	// 检查错误
+	// EN: Check errors.
 	close(errors)
 	for err := range errors {
 		t.Errorf("Concurrent error: %v", err)
 	}
 
 	// 验证文档数量
+	// EN: Verify document count.
 	count := col.Count()
 	if count != 1000 {
 		t.Errorf("Expected 1000 documents, got %d", count)
@@ -311,11 +343,13 @@ func TestConcurrentOperations(t *testing.T) {
 }
 
 // TestDatabaseRecovery 数据库恢复测试
+// EN: TestDatabaseRecovery tests database recovery.
 func TestDatabaseRecovery(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "recovery.db")
 
 	// 第一阶段：写入数据
+	// EN: Phase 1: write data.
 	db, err := OpenDatabase(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
@@ -327,9 +361,11 @@ func TestDatabaseRecovery(t *testing.T) {
 	}
 
 	// 不调用 Close()，模拟崩溃
+	// EN: Do not call Close() to simulate a crash.
 	db.Flush()
 
 	// 第二阶段：重新打开并恢复
+	// EN: Phase 2: reopen and recover.
 	db2, err := OpenDatabase(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to reopen database: %v", err)
@@ -344,6 +380,7 @@ func TestDatabaseRecovery(t *testing.T) {
 	}
 
 	// 验证数据完整性
+	// EN: Verify data integrity.
 	docs, _ := col2.Find(bson.D{})
 	if len(docs) != 100 {
 		t.Errorf("Expected 100 documents, found %d", len(docs))
@@ -351,6 +388,7 @@ func TestDatabaseRecovery(t *testing.T) {
 }
 
 // BenchmarkInsert 插入性能基准测试
+// EN: BenchmarkInsert benchmarks insert performance.
 func BenchmarkInsert(b *testing.B) {
 	tmpDir := b.TempDir()
 	dbPath := filepath.Join(tmpDir, "bench_insert.db")
@@ -372,6 +410,7 @@ func BenchmarkInsert(b *testing.B) {
 }
 
 // BenchmarkFind 查询性能基准测试
+// EN: BenchmarkFind benchmarks query performance.
 func BenchmarkFind(b *testing.B) {
 	tmpDir := b.TempDir()
 	dbPath := filepath.Join(tmpDir, "bench_find.db")
@@ -384,6 +423,7 @@ func BenchmarkFind(b *testing.B) {
 	col, _ := db.Collection("bench")
 
 	// 预先插入数据
+	// EN: Pre-insert data.
 	for i := 0; i < 1000; i++ {
 		col.Insert(bson.D{
 			{Key: "i", Value: int32(i)},
@@ -398,8 +438,8 @@ func BenchmarkFind(b *testing.B) {
 }
 
 // 清理临时文件
+// EN: Clean up temporary files.
 func TestMain(m *testing.M) {
 	code := m.Run()
 	os.Exit(code)
 }
-

@@ -10,23 +10,27 @@ import (
 )
 
 // PipelineStage 表示聚合管道的一个阶段
+// EN: PipelineStage represents a stage in an aggregation pipeline.
 type PipelineStage interface {
 	Execute(docs []bson.D) ([]bson.D, error)
 	Name() string
 }
 
 // Pipeline 聚合管道
+// EN: Pipeline is an aggregation pipeline.
 type Pipeline struct {
 	stages []PipelineStage
 	db     *Database
 }
 
 // NewPipeline 创建聚合管道
+// EN: NewPipeline creates an aggregation pipeline.
 func NewPipeline(stages []bson.D) (*Pipeline, error) {
 	return NewPipelineWithDB(stages, nil)
 }
 
 // NewPipelineWithDB 创建带数据库引用的聚合管道
+// EN: NewPipelineWithDB creates an aggregation pipeline with a database reference.
 func NewPipelineWithDB(stages []bson.D, db *Database) (*Pipeline, error) {
 	p := &Pipeline{
 		stages: make([]PipelineStage, 0, len(stages)),
@@ -52,6 +56,7 @@ func NewPipelineWithDB(stages []bson.D, db *Database) (*Pipeline, error) {
 }
 
 // Execute 执行聚合管道
+// EN: Execute runs the pipeline against the given documents.
 func (p *Pipeline) Execute(docs []bson.D) ([]bson.D, error) {
 	result := docs
 
@@ -67,11 +72,13 @@ func (p *Pipeline) Execute(docs []bson.D) ([]bson.D, error) {
 }
 
 // createStage 创建管道阶段
+// EN: createStage creates a pipeline stage.
 func createStage(name string, spec interface{}) (PipelineStage, error) {
 	return createStageWithDB(name, spec, nil)
 }
 
 // createStageWithDB 创建带数据库引用的管道阶段
+// EN: createStageWithDB creates a pipeline stage with a database reference.
 func createStageWithDB(name string, spec interface{}, db *Database) (PipelineStage, error) {
 	switch name {
 	case "$match":
@@ -104,6 +111,7 @@ func createStageWithDB(name string, spec interface{}, db *Database) (PipelineSta
 }
 
 // MatchStage $match 阶段
+// EN: MatchStage implements the $match stage.
 type MatchStage struct {
 	filter bson.D
 }
@@ -136,6 +144,7 @@ func (s *MatchStage) Execute(docs []bson.D) ([]bson.D, error) {
 }
 
 // ProjectStage $project 阶段
+// EN: ProjectStage implements the $project stage.
 type ProjectStage struct {
 	projection bson.D
 }
@@ -155,6 +164,7 @@ func (s *ProjectStage) Execute(docs []bson.D) ([]bson.D, error) {
 }
 
 // SortStage $sort 阶段
+// EN: SortStage implements the $sort stage.
 type SortStage struct {
 	sortSpec bson.D
 }
@@ -174,6 +184,7 @@ func (s *SortStage) Execute(docs []bson.D) ([]bson.D, error) {
 }
 
 // LimitStage $limit 阶段
+// EN: LimitStage implements the $limit stage.
 type LimitStage struct {
 	limit int64
 }
@@ -196,6 +207,7 @@ func (s *LimitStage) Execute(docs []bson.D) ([]bson.D, error) {
 }
 
 // SkipStage $skip 阶段
+// EN: SkipStage implements the $skip stage.
 type SkipStage struct {
 	skip int64
 }
@@ -221,6 +233,7 @@ func (s *SkipStage) Execute(docs []bson.D) ([]bson.D, error) {
 }
 
 // GroupStage $group 阶段
+// EN: GroupStage implements the $group stage.
 type GroupStage struct {
 	id           interface{}
 	accumulators bson.D
@@ -251,11 +264,13 @@ func (s *GroupStage) Name() string { return "$group" }
 
 func (s *GroupStage) Execute(docs []bson.D) ([]bson.D, error) {
 	// 按 _id 分组
+	// EN: Group by _id.
 	groups := make(map[string]*groupState)
 	groupOrder := make([]string, 0)
 
 	for _, doc := range docs {
 		// 计算分组键
+		// EN: Compute group key.
 		groupKey := s.computeGroupKey(doc)
 		keyStr := fmt.Sprintf("%v", groupKey)
 
@@ -268,6 +283,7 @@ func (s *GroupStage) Execute(docs []bson.D) ([]bson.D, error) {
 		}
 
 		// 收集每个累加器字段的值
+		// EN: Collect values for each accumulator field.
 		for _, acc := range s.accumulators {
 			fieldName := acc.Key
 			accSpec, ok := acc.Value.(bson.D)
@@ -282,6 +298,7 @@ func (s *GroupStage) Execute(docs []bson.D) ([]bson.D, error) {
 			accExpr := accSpec[0].Value
 
 			// 提取表达式的值
+			// EN: Evaluate expression value.
 			val := s.evaluateExpression(accExpr, doc)
 			groups[keyStr].values[fieldName+"_"+accOp] = append(groups[keyStr].values[fieldName+"_"+accOp], val)
 			groups[keyStr].accumulators = s.accumulators
@@ -289,6 +306,7 @@ func (s *GroupStage) Execute(docs []bson.D) ([]bson.D, error) {
 	}
 
 	// 计算最终结果
+	// EN: Compute final result.
 	result := make([]bson.D, 0, len(groups))
 	for _, keyStr := range groupOrder {
 		state := groups[keyStr]
@@ -356,6 +374,7 @@ func (s *GroupStage) computeGroupKey(doc bson.D) interface{} {
 	}
 
 	// 字符串形式的字段引用 "$field"
+	// EN: Field reference in string form: "$field".
 	if idStr, ok := s.id.(string); ok {
 		if len(idStr) > 0 && idStr[0] == '$' {
 			return getDocField(doc, idStr[1:])
@@ -364,6 +383,7 @@ func (s *GroupStage) computeGroupKey(doc bson.D) interface{} {
 	}
 
 	// 文档形式的复合键
+	// EN: Composite key in document form.
 	if idDoc, ok := s.id.(bson.D); ok {
 		result := bson.D{}
 		for _, elem := range idDoc {
@@ -381,6 +401,7 @@ func (s *GroupStage) computeGroupKey(doc bson.D) interface{} {
 
 func (s *GroupStage) evaluateExpression(expr interface{}, doc bson.D) interface{} {
 	// 字符串形式的字段引用
+	// EN: Field reference in string form.
 	if exprStr, ok := expr.(string); ok {
 		if len(exprStr) > 0 && exprStr[0] == '$' {
 			return getDocField(doc, exprStr[1:])
@@ -389,6 +410,7 @@ func (s *GroupStage) evaluateExpression(expr interface{}, doc bson.D) interface{
 	}
 
 	// 数值常量
+	// EN: Numeric constants.
 	if num, ok := expr.(int); ok {
 		return num
 	}
@@ -460,6 +482,7 @@ func (s *GroupStage) computeAddToSet(values []interface{}) bson.A {
 }
 
 // CountStage $count 阶段
+// EN: CountStage implements the $count stage.
 type CountStage struct {
 	field string
 }
@@ -481,6 +504,7 @@ func (s *CountStage) Execute(docs []bson.D) ([]bson.D, error) {
 }
 
 // UnwindStage $unwind 阶段
+// EN: UnwindStage implements the $unwind stage.
 type UnwindStage struct {
 	path                       string
 	preserveNullAndEmptyArrays bool
@@ -556,6 +580,7 @@ func (s *UnwindStage) Execute(docs []bson.D) ([]bson.D, error) {
 }
 
 // AddFieldsStage $addFields 阶段
+// EN: AddFieldsStage implements the $addFields stage.
 type AddFieldsStage struct {
 	fields bson.D
 }
@@ -599,6 +624,7 @@ func (s *AddFieldsStage) evaluateExpression(expr interface{}, doc bson.D) interf
 }
 
 // toInt64 转换为 int64
+// EN: toInt64 converts a numeric value to int64.
 func toInt64(v interface{}) (int64, error) {
 	switch n := v.(type) {
 	case int:
@@ -615,17 +641,20 @@ func toInt64(v interface{}) (int64, error) {
 }
 
 // Aggregate 在集合上执行聚合管道
+// EN: Aggregate executes an aggregation pipeline on the collection.
 func (c *Collection) Aggregate(pipeline []bson.D) ([]bson.D, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	// 获取所有文档作为初始输入
+	// EN: Load all documents as the initial input.
 	docs, err := c.findUnlocked(nil)
 	if err != nil {
 		return nil, err
 	}
 
 	// 创建并执行管道（传入 Database 以支持 $lookup 等跨集合操作）
+	// EN: Create and execute pipeline (pass Database to support cross-collection stages like $lookup).
 	p, err := NewPipelineWithDB(pipeline, c.db)
 	if err != nil {
 		return nil, err
@@ -635,13 +664,15 @@ func (c *Collection) Aggregate(pipeline []bson.D) ([]bson.D, error) {
 }
 
 // AggregateResult 聚合结果（带光标）
+// EN: AggregateResult is an aggregation result with cursor info.
 type AggregateResult struct {
-	Cursor   CursorInfo
-	Ok       int32
-	Docs     []bson.D
+	Cursor CursorInfo
+	Ok     int32
+	Docs   []bson.D
 }
 
 // CursorInfo 光标信息
+// EN: CursorInfo describes cursor information.
 type CursorInfo struct {
 	Id         int64
 	Ns         string
@@ -649,6 +680,7 @@ type CursorInfo struct {
 }
 
 // SortByFields 按字段排序文档（使用 CompareBSON 实现 MongoDB 标准排序规则）
+// EN: SortByFields sorts documents by fields using MongoDB comparison semantics (CompareBSON).
 func SortByFields(docs []bson.D, fields bson.D) []bson.D {
 	result := make([]bson.D, len(docs))
 	copy(result, docs)
@@ -667,6 +699,7 @@ func SortByFields(docs []bson.D, fields bson.D) []bson.D {
 			valJ := getDocField(result[j], key)
 
 			// 使用 CompareBSON 实现 MongoDB 标准 BSON 类型比较规则
+			// EN: Use CompareBSON to follow MongoDB BSON type ordering/comparison rules.
 			cmp := CompareBSON(valI, valJ)
 			if cmp != 0 {
 				if dir < 0 {
@@ -682,6 +715,7 @@ func SortByFields(docs []bson.D, fields bson.D) []bson.D {
 }
 
 // UnsetStage $unset 阶段 - 移除指定字段
+// EN: UnsetStage implements the $unset stage (removes specified fields).
 type UnsetStage struct {
 	fields []string
 }
@@ -731,6 +765,7 @@ func (s *UnsetStage) Execute(docs []bson.D) ([]bson.D, error) {
 }
 
 // ReplaceRootStage $replaceRoot 阶段 - 替换根文档
+// EN: ReplaceRootStage implements the $replaceRoot stage (replaces the root document).
 type ReplaceRootStage struct {
 	newRoot interface{}
 }
@@ -775,6 +810,7 @@ func (s *ReplaceRootStage) evaluateNewRoot(doc bson.D) bson.D {
 	switch v := s.newRoot.(type) {
 	case string:
 		// 字段引用 "$field"
+		// EN: Field reference: "$field".
 		if len(v) > 0 && v[0] == '$' {
 			val := getDocField(doc, v[1:])
 			if resultDoc, ok := val.(bson.D); ok {
@@ -783,6 +819,7 @@ func (s *ReplaceRootStage) evaluateNewRoot(doc bson.D) bson.D {
 		}
 	case bson.D:
 		// 文档表达式
+		// EN: Document expression.
 		resultDoc := bson.D{}
 		for _, elem := range v {
 			val := s.evaluateExpr(elem.Value, doc)
@@ -804,6 +841,7 @@ func (s *ReplaceRootStage) evaluateExpr(expr interface{}, doc bson.D) interface{
 }
 
 // LookupStage $lookup 阶段 - 左连接其他集合
+// EN: LookupStage implements the $lookup stage (left outer join).
 type LookupStage struct {
 	from         string
 	localField   string
@@ -856,9 +894,11 @@ func (s *LookupStage) Execute(docs []bson.D) ([]bson.D, error) {
 	}
 
 	// 获取目标集合
+	// EN: Get foreign collection.
 	foreignColl := s.db.GetCollection(s.from)
 	if foreignColl == nil {
 		// 集合不存在，返回空数组
+		// EN: Collection does not exist; return empty arrays.
 		result := make([]bson.D, len(docs))
 		for i, doc := range docs {
 			newDoc := make(bson.D, len(doc)+1)
@@ -870,6 +910,7 @@ func (s *LookupStage) Execute(docs []bson.D) ([]bson.D, error) {
 	}
 
 	// 获取外部集合的所有文档
+	// EN: Load all documents from the foreign collection.
 	foreignDocs, err := foreignColl.Find(nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query foreign collection: %w", err)
@@ -879,9 +920,11 @@ func (s *LookupStage) Execute(docs []bson.D) ([]bson.D, error) {
 
 	for i, doc := range docs {
 		// 获取本地字段值
+		// EN: Get local field value.
 		localVal := getDocField(doc, s.localField)
 
 		// 查找匹配的外部文档
+		// EN: Find matching foreign documents.
 		matches := bson.A{}
 		for _, foreignDoc := range foreignDocs {
 			foreignVal := getDocField(foreignDoc, s.foreignField)
@@ -891,6 +934,7 @@ func (s *LookupStage) Execute(docs []bson.D) ([]bson.D, error) {
 		}
 
 		// 创建新文档，添加匹配结果
+		// EN: Create a new document with the matches appended.
 		newDoc := make(bson.D, 0, len(doc)+1)
 		for _, elem := range doc {
 			newDoc = append(newDoc, elem)
@@ -903,3 +947,4 @@ func (s *LookupStage) Execute(docs []bson.D) ([]bson.D, error) {
 }
 
 // valuesEqual 已在 collection.go 中定义
+// EN: valuesEqual is defined in collection.go.

@@ -37,6 +37,7 @@ func main() {
 	sales.Drop(ctx)
 
 	// 插入销售数据
+	// EN: Insert sales data.
 	fmt.Println("\n=== Inserting Sales Data ===")
 	docs := []interface{}{
 		bson.D{{Key: "item", Value: "apple"}, {Key: "quantity", Value: 10}, {Key: "price", Value: 2.5}, {Key: "category", Value: "fruit"}},
@@ -53,6 +54,7 @@ func main() {
 	fmt.Printf("Inserted %d documents\n", len(result.InsertedIDs))
 
 	// 测试 $match
+	// EN: Test $match.
 	fmt.Println("\n=== Test $match: category = fruit ===")
 	pipeline := mongo.Pipeline{
 		{{Key: "$match", Value: bson.D{{Key: "category", Value: "fruit"}}}},
@@ -71,6 +73,7 @@ func main() {
 	}
 
 	// 测试 $sort + $limit
+	// EN: Test $sort + $limit.
 	fmt.Println("\n=== Test $sort + $limit: top 3 by quantity ===")
 	pipeline = mongo.Pipeline{
 		{{Key: "$sort", Value: bson.D{{Key: "quantity", Value: -1}}}},
@@ -90,6 +93,7 @@ func main() {
 	}
 
 	// 测试 $project
+	// EN: Test $project.
 	fmt.Println("\n=== Test $project: only item and totalPrice ===")
 	pipeline = mongo.Pipeline{
 		{{Key: "$project", Value: bson.D{
@@ -112,6 +116,7 @@ func main() {
 	}
 
 	// 测试 $skip
+	// EN: Test $skip.
 	fmt.Println("\n=== Test $sort + $skip + $limit: skip 2, limit 2 ===")
 	pipeline = mongo.Pipeline{
 		{{Key: "$sort", Value: bson.D{{Key: "price", Value: -1}}}},
@@ -132,6 +137,7 @@ func main() {
 	}
 
 	// 测试 $group
+	// EN: Test $group.
 	fmt.Println("\n=== Test $group: total quantity by category ===")
 	pipeline = mongo.Pipeline{
 		{{Key: "$group", Value: bson.D{
@@ -156,6 +162,7 @@ func main() {
 	}
 
 	// 测试 $count
+	// EN: Test $count.
 	fmt.Println("\n=== Test $count ===")
 	pipeline = mongo.Pipeline{
 		{{Key: "$match", Value: bson.D{{Key: "category", Value: "vegetable"}}}},
@@ -172,6 +179,7 @@ func main() {
 	fmt.Printf("Count result: %v\n", results)
 
 	// 测试 $group with $max/$min
+	// EN: Test $group with $max/$min.
 	fmt.Println("\n=== Test $group with $max/$min ===")
 	pipeline = mongo.Pipeline{
 		{{Key: "$group", Value: bson.D{
@@ -194,6 +202,7 @@ func main() {
 	}
 
 	// 测试复杂管道
+	// EN: Test a complex pipeline.
 	fmt.Println("\n=== Test Complex Pipeline: match + group + sort ===")
 	pipeline = mongo.Pipeline{
 		{{Key: "$match", Value: bson.D{{Key: "quantity", Value: bson.D{{Key: "$gte", Value: 10}}}}}},

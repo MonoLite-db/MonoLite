@@ -16,10 +16,12 @@ import (
 
 func main() {
 	// 连接到 MonoDB
+	// EN: Connect to MonoDB.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	// 使用 directConnection=true 避免副本集发现
+	// EN: Use directConnection=true to avoid replica set discovery.
 	clientOpts := options.Client().
 		ApplyURI("mongodb://localhost:27017").
 		SetDirect(true)
@@ -31,6 +33,7 @@ func main() {
 	defer client.Disconnect(ctx)
 
 	// Ping 测试
+	// EN: Ping test.
 	fmt.Println("=== Ping Test ===")
 	if err := client.Ping(ctx, nil); err != nil {
 		log.Fatalf("Ping failed: %v", err)
@@ -38,14 +41,17 @@ func main() {
 	fmt.Println("Ping successful!")
 
 	// 获取数据库和集合
+	// EN: Get database and collection.
 	db := client.Database("testdb")
 	users := db.Collection("users")
 
 	// 清理旧数据
+	// EN: Cleanup old data.
 	fmt.Println("\n=== Cleanup ===")
 	users.Drop(ctx)
 
 	// Insert 测试
+	// EN: Insert test.
 	fmt.Println("\n=== Insert Test ===")
 	result, err := users.InsertOne(ctx, bson.D{
 		{Key: "name", Value: "张三"},
@@ -58,6 +64,7 @@ func main() {
 	fmt.Printf("Inserted ID: %v\n", result.InsertedID)
 
 	// InsertMany 测试
+	// EN: InsertMany test.
 	manyResult, err := users.InsertMany(ctx, []interface{}{
 		bson.D{{Key: "name", Value: "李四"}, {Key: "age", Value: 30}},
 		bson.D{{Key: "name", Value: "王五"}, {Key: "age", Value: 28}},
@@ -68,6 +75,7 @@ func main() {
 	fmt.Printf("Inserted %d documents\n", len(manyResult.InsertedIDs))
 
 	// Find 测试
+	// EN: Find test.
 	fmt.Println("\n=== Find Test ===")
 	cursor, err := users.Find(ctx, bson.D{})
 	if err != nil {
@@ -85,6 +93,7 @@ func main() {
 	}
 
 	// FindOne 测试
+	// EN: FindOne test.
 	fmt.Println("\n=== FindOne Test ===")
 	var found bson.M
 	err = users.FindOne(ctx, bson.D{{Key: "name", Value: "张三"}}).Decode(&found)
@@ -94,6 +103,7 @@ func main() {
 	fmt.Printf("Found: %v\n", found)
 
 	// Update 测试
+	// EN: Update test.
 	fmt.Println("\n=== Update Test ===")
 	updateResult, err := users.UpdateOne(
 		ctx,
@@ -106,6 +116,7 @@ func main() {
 	fmt.Printf("Modified %d document(s)\n", updateResult.ModifiedCount)
 
 	// 验证更新
+	// EN: Verify the update.
 	err = users.FindOne(ctx, bson.D{{Key: "name", Value: "张三"}}).Decode(&found)
 	if err != nil {
 		log.Fatalf("FindOne after update failed: %v", err)
@@ -113,6 +124,7 @@ func main() {
 	fmt.Printf("After update: %v\n", found)
 
 	// Count 测试
+	// EN: Count test.
 	fmt.Println("\n=== Count Test ===")
 	count, err := users.CountDocuments(ctx, bson.D{})
 	if err != nil {
@@ -121,6 +133,7 @@ func main() {
 	fmt.Printf("Total documents: %d\n", count)
 
 	// Delete 测试
+	// EN: Delete test.
 	fmt.Println("\n=== Delete Test ===")
 	deleteResult, err := users.DeleteOne(ctx, bson.D{{Key: "name", Value: "王五"}})
 	if err != nil {
@@ -129,6 +142,7 @@ func main() {
 	fmt.Printf("Deleted %d document(s)\n", deleteResult.DeletedCount)
 
 	// 最终计数
+	// EN: Final count.
 	count, _ = users.CountDocuments(ctx, bson.D{})
 	fmt.Printf("Final count: %d\n", count)
 

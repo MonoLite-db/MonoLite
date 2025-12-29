@@ -1,6 +1,7 @@
 // Created by Yanjunhui
 //
 // BSON Round-trip 测试：验证数据导入导出的一致性
+// EN: BSON round-trip tests: verify consistency of data import/export.
 
 package engine
 
@@ -14,6 +15,7 @@ import (
 )
 
 // TestBSONRoundtrip 测试 BSON 序列化/反序列化的一致性
+// EN: TestBSONRoundtrip tests consistency of BSON marshal/unmarshal.
 func TestBSONRoundtrip(t *testing.T) {
 	db, cleanup := setupTestDBForRoundtrip(t)
 	defer cleanup()
@@ -21,9 +23,11 @@ func TestBSONRoundtrip(t *testing.T) {
 	col, _ := db.Collection("roundtrip")
 
 	// 创建包含各种 BSON 类型的测试文档
+	// EN: Create test documents containing various BSON types.
 	testDocs := createTestDocuments()
 
 	// 插入文档
+	// EN: Insert documents.
 	for _, doc := range testDocs {
 		_, err := col.Insert(doc)
 		if err != nil {
@@ -32,6 +36,7 @@ func TestBSONRoundtrip(t *testing.T) {
 	}
 
 	// 查询所有文档
+	// EN: Query all documents.
 	results, err := col.Find(nil)
 	if err != nil {
 		t.Fatalf("查询失败: %v", err)
@@ -42,12 +47,14 @@ func TestBSONRoundtrip(t *testing.T) {
 	}
 
 	// 验证每个文档的字段
+	// EN: Verify fields of each document.
 	for i, result := range results {
 		verifyDocument(t, i, result)
 	}
 }
 
 // TestBSONTypesPreservation 测试各种 BSON 类型的保持
+// EN: TestBSONTypesPreservation tests preservation of various BSON types.
 func TestBSONTypesPreservation(t *testing.T) {
 	db, cleanup := setupTestDBForRoundtrip(t)
 	defer cleanup()
@@ -55,6 +62,7 @@ func TestBSONTypesPreservation(t *testing.T) {
 	col, _ := db.Collection("types")
 
 	// 测试 String
+	// EN: Test String.
 	t.Run("String", func(t *testing.T) {
 		doc := bson.D{{Key: "str", Value: "hello 你好"}}
 		col.Insert(doc)
@@ -65,6 +73,7 @@ func TestBSONTypesPreservation(t *testing.T) {
 	})
 
 	// 测试 Int32
+	// EN: Test Int32.
 	t.Run("Int32", func(t *testing.T) {
 		doc := bson.D{{Key: "int32", Value: int32(42)}}
 		col.Insert(doc)
@@ -75,6 +84,7 @@ func TestBSONTypesPreservation(t *testing.T) {
 	})
 
 	// 测试 Int64
+	// EN: Test Int64.
 	t.Run("Int64", func(t *testing.T) {
 		doc := bson.D{{Key: "int64", Value: int64(9223372036854775807)}}
 		col.Insert(doc)
@@ -85,6 +95,7 @@ func TestBSONTypesPreservation(t *testing.T) {
 	})
 
 	// 测试 Float64
+	// EN: Test Float64.
 	t.Run("Float64", func(t *testing.T) {
 		doc := bson.D{{Key: "float64", Value: 3.14159265358979}}
 		col.Insert(doc)
@@ -103,6 +114,7 @@ func TestBSONTypesPreservation(t *testing.T) {
 	})
 
 	// 测试 Boolean
+	// EN: Test Boolean.
 	t.Run("Boolean", func(t *testing.T) {
 		doc := bson.D{{Key: "bool", Value: true}}
 		col.Insert(doc)
@@ -113,6 +125,7 @@ func TestBSONTypesPreservation(t *testing.T) {
 	})
 
 	// 测试 Null
+	// EN: Test Null.
 	t.Run("Null", func(t *testing.T) {
 		doc := bson.D{{Key: "null", Value: nil}}
 		col.Insert(doc)
@@ -123,6 +136,7 @@ func TestBSONTypesPreservation(t *testing.T) {
 	})
 
 	// 测试 ObjectID
+	// EN: Test ObjectID.
 	t.Run("ObjectID", func(t *testing.T) {
 		oid := primitive.NewObjectID()
 		doc := bson.D{{Key: "oid", Value: oid}}
@@ -134,6 +148,7 @@ func TestBSONTypesPreservation(t *testing.T) {
 	})
 
 	// 测试 Array
+	// EN: Test Array.
 	t.Run("Array", func(t *testing.T) {
 		doc := bson.D{{Key: "arr", Value: bson.A{1, 2, 3, "four", true}}}
 		col.Insert(doc)
@@ -152,6 +167,7 @@ func TestBSONTypesPreservation(t *testing.T) {
 	})
 
 	// 测试 Embedded Document
+	// EN: Test Embedded Document.
 	t.Run("EmbeddedDocument", func(t *testing.T) {
 		doc := bson.D{{Key: "nested", Value: bson.D{
 			{Key: "a", Value: 1},
@@ -173,6 +189,7 @@ func TestBSONTypesPreservation(t *testing.T) {
 	})
 
 	// 测试 DateTime
+	// EN: Test DateTime.
 	t.Run("DateTime", func(t *testing.T) {
 		now := primitive.NewDateTimeFromTime(time.Now())
 		doc := bson.D{{Key: "date", Value: now}}
@@ -193,6 +210,7 @@ func TestBSONTypesPreservation(t *testing.T) {
 }
 
 // TestDocumentUpdateRoundtrip 测试文档更新后的一致性
+// EN: TestDocumentUpdateRoundtrip tests consistency after document updates.
 func TestDocumentUpdateRoundtrip(t *testing.T) {
 	db, cleanup := setupTestDBForRoundtrip(t)
 	defer cleanup()
@@ -200,6 +218,7 @@ func TestDocumentUpdateRoundtrip(t *testing.T) {
 	col, _ := db.Collection("update_test")
 
 	// 插入原始文档
+	// EN: Insert the original document.
 	original := bson.D{
 		{Key: "name", Value: "test"},
 		{Key: "count", Value: int32(0)},
@@ -209,6 +228,7 @@ func TestDocumentUpdateRoundtrip(t *testing.T) {
 	id := ids[0]
 
 	// 更新文档
+	// EN: Update the document.
 	col.Update(
 		bson.D{{Key: "_id", Value: id}},
 		bson.D{{Key: "$set", Value: bson.D{{Key: "count", Value: int32(10)}}}},
@@ -216,6 +236,7 @@ func TestDocumentUpdateRoundtrip(t *testing.T) {
 	)
 
 	// 验证更新
+	// EN: Verify the update.
 	result, _ := col.FindById(id)
 	if result == nil {
 		t.Fatal("更新后查询失败")
@@ -233,6 +254,7 @@ func TestDocumentUpdateRoundtrip(t *testing.T) {
 }
 
 // TestMediumDocumentRoundtrip 测试中等大小文档的一致性
+// EN: TestMediumDocumentRoundtrip tests consistency for medium-sized documents.
 func TestMediumDocumentRoundtrip(t *testing.T) {
 	db, cleanup := setupTestDBForRoundtrip(t)
 	defer cleanup()
@@ -240,6 +262,7 @@ func TestMediumDocumentRoundtrip(t *testing.T) {
 	col, _ := db.Collection("medium")
 
 	// 创建包含多个字段的文档（适合单页存储）
+	// EN: Create a document with many fields (fits single-page storage).
 	doc := bson.D{}
 	for i := 0; i < 50; i++ {
 		doc = append(doc, bson.E{
@@ -249,6 +272,7 @@ func TestMediumDocumentRoundtrip(t *testing.T) {
 	}
 
 	// 添加一个中等字符串（约 500 字节）
+	// EN: Add a medium string (~500 bytes).
 	mediumString := ""
 	for i := 0; i < 50; i++ {
 		mediumString += "abcdefghij"
@@ -256,6 +280,7 @@ func TestMediumDocumentRoundtrip(t *testing.T) {
 	doc = append(doc, bson.E{Key: "medium_string", Value: mediumString})
 
 	// 添加嵌套数组
+	// EN: Add a nested array.
 	arr := bson.A{}
 	for i := 0; i < 10; i++ {
 		arr = append(arr, bson.D{{Key: "index", Value: i}, {Key: "value", Value: i * i}})
@@ -263,29 +288,34 @@ func TestMediumDocumentRoundtrip(t *testing.T) {
 	doc = append(doc, bson.E{Key: "nested_array", Value: arr})
 
 	// 插入
+	// EN: Insert.
 	ids, err := col.Insert(doc)
 	if err != nil {
 		t.Fatalf("插入文档失败: %v", err)
 	}
 
 	// 查询
+	// EN: Query.
 	result, err := col.FindById(ids[0])
 	if err != nil {
 		t.Fatalf("查询文档失败: %v", err)
 	}
 
 	// 验证字段数量（50 + 2 额外字段 + _id）
+	// EN: Verify field count (50 + 2 extra fields + _id).
 	if len(result) < 52 {
 		t.Errorf("期望至少 52 个字段，实际 %d 个", len(result))
 	}
 
 	// 验证中等字符串
+	// EN: Verify medium string.
 	str := getDocField(result, "medium_string")
 	if s, ok := str.(string); !ok || len(s) != 500 {
 		t.Error("字符串未正确保持")
 	}
 
 	// 验证嵌套数组
+	// EN: Verify nested array.
 	nestedArr := getDocField(result, "nested_array")
 	if arr, ok := nestedArr.(bson.A); !ok || len(arr) != 10 {
 		t.Error("嵌套数组未正确保持")
@@ -293,6 +323,7 @@ func TestMediumDocumentRoundtrip(t *testing.T) {
 }
 
 // TestBSONMarshalUnmarshal 测试 BSON 序列化反序列化
+// EN: TestBSONMarshalUnmarshal tests BSON marshal/unmarshal.
 func TestBSONMarshalUnmarshal(t *testing.T) {
 	testCases := []struct {
 		name string
@@ -328,18 +359,21 @@ func TestBSONMarshalUnmarshal(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// 序列化
+			// EN: Marshal.
 			data, err := bson.Marshal(tc.doc)
 			if err != nil {
 				t.Fatalf("序列化失败: %v", err)
 			}
 
 			// 反序列化
+			// EN: Unmarshal.
 			var result bson.D
 			if err := bson.Unmarshal(data, &result); err != nil {
 				t.Fatalf("反序列化失败: %v", err)
 			}
 
 			// 验证字段数量
+			// EN: Verify field count.
 			if len(result) != len(tc.doc) {
 				t.Errorf("字段数量不匹配: 期望 %d，实际 %d", len(tc.doc), len(result))
 			}
@@ -348,6 +382,7 @@ func TestBSONMarshalUnmarshal(t *testing.T) {
 }
 
 // TestQueryConsistency 测试查询结果的一致性
+// EN: TestQueryConsistency tests consistency of query results.
 func TestQueryConsistency(t *testing.T) {
 	db, cleanup := setupTestDBForRoundtrip(t)
 	defer cleanup()
@@ -355,6 +390,7 @@ func TestQueryConsistency(t *testing.T) {
 	col, _ := db.Collection("query_test")
 
 	// 插入测试数据
+	// EN: Insert test data.
 	docs := []bson.D{
 		{{Key: "x", Value: int32(1)}, {Key: "y", Value: int32(10)}},
 		{{Key: "x", Value: int32(2)}, {Key: "y", Value: int32(20)}},
@@ -368,6 +404,7 @@ func TestQueryConsistency(t *testing.T) {
 	}
 
 	// 测试等值查询
+	// EN: Test equality query.
 	t.Run("等值查询", func(t *testing.T) {
 		results, _ := col.Find(bson.D{{Key: "x", Value: int32(3)}})
 		if len(results) != 1 {
@@ -376,6 +413,7 @@ func TestQueryConsistency(t *testing.T) {
 	})
 
 	// 测试范围查询
+	// EN: Test range query.
 	t.Run("范围查询", func(t *testing.T) {
 		results, _ := col.Find(bson.D{{Key: "x", Value: bson.D{{Key: "$gt", Value: int32(2)}}}})
 		if len(results) != 3 {
@@ -384,6 +422,7 @@ func TestQueryConsistency(t *testing.T) {
 	})
 
 	// 测试多条件查询
+	// EN: Test multi-condition query.
 	t.Run("多条件查询", func(t *testing.T) {
 		results, _ := col.Find(bson.D{
 			{Key: "x", Value: bson.D{{Key: "$gte", Value: int32(2)}}},
@@ -395,6 +434,7 @@ func TestQueryConsistency(t *testing.T) {
 	})
 
 	// 测试排序
+	// EN: Test sorting.
 	t.Run("排序", func(t *testing.T) {
 		results, _ := col.FindWithOptions(nil, &QueryOptions{
 			Sort: bson.D{{Key: "x", Value: int32(-1)}},
@@ -411,6 +451,7 @@ func TestQueryConsistency(t *testing.T) {
 	})
 
 	// 测试 Skip 和 Limit
+	// EN: Test skip and limit.
 	t.Run("Skip和Limit", func(t *testing.T) {
 		results, _ := col.FindWithOptions(nil, &QueryOptions{
 			Sort:  bson.D{{Key: "x", Value: int32(1)}},
@@ -429,6 +470,7 @@ func TestQueryConsistency(t *testing.T) {
 	})
 
 	// 测试投影
+	// EN: Test projection.
 	t.Run("投影", func(t *testing.T) {
 		results, _ := col.FindWithOptions(nil, &QueryOptions{
 			Projection: bson.D{{Key: "x", Value: int32(1)}, {Key: "_id", Value: int32(0)}},
@@ -448,6 +490,7 @@ func TestQueryConsistency(t *testing.T) {
 }
 
 // 辅助函数
+// EN: Helper functions.
 
 func setupTestDBForRoundtrip(t *testing.T) (*Database, func()) {
 	tmpFile, err := os.CreateTemp("", "monodb_roundtrip_test_*.db")

@@ -1,7 +1,10 @@
 // Created by Yanjunhui
 //
 // monodb-export: 数据导出工具
+// EN: monodb-export is a data export tool.
+//
 // 支持导出为 BSON（MongoDB 兼容）和 JSON 格式
+// EN: It supports exporting data as BSON (MongoDB-compatible) and JSON formats.
 
 package main
 
@@ -52,6 +55,7 @@ func main() {
 	}
 
 	// 打开数据库
+	// EN: Open database.
 	db, err := engine.OpenDatabase(*dbPath)
 	if err != nil {
 		log.Fatalf("打开数据库失败: %v", err)
@@ -60,11 +64,13 @@ func main() {
 
 	if *outputDir != "" {
 		// 导出所有集合到目录
+		// EN: Export all collections to a directory.
 		if err := exportAllCollections(db, *outputDir); err != nil {
 			log.Fatalf("导出失败: %v", err)
 		}
 	} else {
 		// 导出单个集合
+		// EN: Export a single collection.
 		if *collection == "" {
 			fmt.Fprintln(os.Stderr, "错误: 必须指定集合名称 (-collection) 或输出目录 (-dir)")
 			flag.Usage()
@@ -85,8 +91,10 @@ func main() {
 }
 
 // exportAllCollections 导出所有集合
+// EN: exportAllCollections exports all collections.
 func exportAllCollections(db *engine.Database, dir string) error {
 	// 创建输出目录
+	// EN: Create output directory.
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("创建目录失败: %w", err)
 	}
@@ -110,6 +118,7 @@ func exportAllCollections(db *engine.Database, dir string) error {
 }
 
 // exportCollection 导出单个集合
+// EN: exportCollection exports a single collection.
 func exportCollection(db *engine.Database, colName, outputPath string) error {
 	col := db.GetCollection(colName)
 	if col == nil {
@@ -117,6 +126,7 @@ func exportCollection(db *engine.Database, colName, outputPath string) error {
 	}
 
 	// 解析查询过滤器
+	// EN: Parse query filter.
 	var filter bson.D
 	if *query != "" {
 		if err := bson.UnmarshalExtJSON([]byte(*query), true, &filter); err != nil {
@@ -125,6 +135,7 @@ func exportCollection(db *engine.Database, colName, outputPath string) error {
 	}
 
 	// 查询文档
+	// EN: Query documents.
 	docs, err := col.Find(filter)
 	if err != nil {
 		return fmt.Errorf("查询失败: %w", err)
@@ -135,6 +146,7 @@ func exportCollection(db *engine.Database, colName, outputPath string) error {
 	}
 
 	// 创建输出文件
+	// EN: Create output file.
 	file, err := os.Create(outputPath)
 	if err != nil {
 		return fmt.Errorf("创建文件失败: %w", err)
@@ -142,6 +154,7 @@ func exportCollection(db *engine.Database, colName, outputPath string) error {
 	defer file.Close()
 
 	// 根据格式导出
+	// EN: Export based on requested format.
 	switch *format {
 	case "bson":
 		return exportBSON(file, docs)
@@ -155,6 +168,7 @@ func exportCollection(db *engine.Database, colName, outputPath string) error {
 }
 
 // exportBSON 导出为 BSON 格式
+// EN: exportBSON exports documents as raw BSON (concatenated documents).
 func exportBSON(file *os.File, docs []bson.D) error {
 	for _, doc := range docs {
 		data, err := bson.Marshal(doc)
@@ -171,6 +185,7 @@ func exportBSON(file *os.File, docs []bson.D) error {
 }
 
 // exportJSONL 导出为 JSON Lines 格式
+// EN: exportJSONL exports documents as JSON Lines (one document per line).
 func exportJSONL(file *os.File, docs []bson.D) error {
 	for _, doc := range docs {
 		var data []byte
@@ -198,8 +213,10 @@ func exportJSONL(file *os.File, docs []bson.D) error {
 }
 
 // exportJSON 导出为 JSON 数组格式
+// EN: exportJSON exports documents as a JSON array.
 func exportJSON(file *os.File, docs []bson.D) error {
 	// 转换为可 JSON 序列化的格式
+	// EN: Convert to JSON-serializable types.
 	arr := make([]interface{}, len(docs))
 	for i, doc := range docs {
 		arr[i] = docToMap(doc)
@@ -229,6 +246,7 @@ func exportJSON(file *os.File, docs []bson.D) error {
 }
 
 // docToMap 将 bson.D 转换为 map
+// EN: docToMap converts bson.D into a map for JSON encoding.
 func docToMap(doc bson.D) map[string]interface{} {
 	m := make(map[string]interface{})
 	for _, elem := range doc {
@@ -238,6 +256,7 @@ func docToMap(doc bson.D) map[string]interface{} {
 }
 
 // convertValue 转换值类型以便 JSON 序列化
+// EN: convertValue converts nested BSON types into JSON-friendly values.
 func convertValue(v interface{}) interface{} {
 	switch val := v.(type) {
 	case bson.D:

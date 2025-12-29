@@ -11,6 +11,7 @@ import (
 
 func TestLogErrorDoesNotPanic(t *testing.T) {
 	// 捕获 stdout，避免测试输出污染
+	// EN: Capture stdout to avoid polluting test output.
 	old := os.Stdout
 	r, w, err := os.Pipe()
 	if err != nil {
@@ -32,5 +33,3 @@ func TestLogErrorDoesNotPanic(t *testing.T) {
 		t.Fatalf("expected LogError to write something to stdout")
 	}
 }
-
-
