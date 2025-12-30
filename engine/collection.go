@@ -5,6 +5,7 @@ package engine
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -657,6 +658,17 @@ func (c *Collection) Update(filter bson.D, update bson.D, upsert bool) (*UpdateR
 		for _, elem := range filter {
 			if len(elem.Key) > 0 && elem.Key[0] != '$' {
 				newDoc = append(newDoc, elem)
+			}
+		}
+		// 应用 $setOnInsert（仅在 upsert 插入时生效）
+		// EN: Apply $setOnInsert (only effective on upsert insert).
+		for _, elem := range update {
+			if elem.Key == "$setOnInsert" {
+				if setOnInsertDoc, ok := elem.Value.(bson.D); ok {
+					for _, setElem := range setOnInsertDoc {
+						setField(&newDoc, setElem.Key, setElem.Value)
+					}
+				}
 			}
 		}
 		// 应用更新
@@ -1478,6 +1490,20 @@ func applyUpdate(doc *bson.D, update bson.D) error {
 				pullAllFromArray(doc, pullElem.Key, pullElem.Value)
 			}
 
+		case "$currentDate":
+			cdDoc, ok := elem.Value.(bson.D)
+			if !ok {
+				return fmt.Errorf("$currentDate value must be a document")
+			}
+			for _, cdElem := range cdDoc {
+				setCurrentDate(doc, cdElem.Key, cdElem.Value)
+			}
+
+		case "$setOnInsert":
+			// $setOnInsert 仅在 upsert 产生新文档时生效，在普通更新中忽略
+			// EN: $setOnInsert only takes effect when upsert inserts a new document; ignored in normal updates.
+			continue
+
 		default:
 			// 非操作符字段，直接设置（替换模式）
 			// EN: Non-operator field: set directly (replacement mode).
@@ -1765,6 +1791,46 @@ func arrayContains(arr bson.A, value interface{}) bool {
 		}
 	}
 	return false
+}
+
+// setCurrentDate 设置字段为当前日期或时间戳
+// EN: setCurrentDate sets a field to the current date or timestamp.
+func setCurrentDate(doc *bson.D, key string, spec interface{}) {
+	now := time.Now()
+
+	// 检查 spec 的类型
+	// EN: Check the type of spec.
+	switch v := spec.(type) {
+	case bool:
+		if v {
+			// true 表示设置为日期时间
+			// EN: true means set to DateTime.
+			setField(doc, key, primitive.NewDateTimeFromTime(now))
+		}
+	case bson.D:
+		// 检查 $type 指定
+		// EN: Check for $type specification.
+		for _, elem := range v {
+			if elem.Key == "$type" {
+				if typeName, ok := elem.Value.(string); ok {
+					if typeName == "timestamp" {
+						// 设置为 BSON Timestamp
+						// EN: Set to BSON Timestamp.
+						ts := primitive.Timestamp{T: uint32(now.Unix()), I: 0}
+						setField(doc, key, ts)
+						return
+					}
+				}
+			}
+		}
+		// 默认设置为日期时间
+		// EN: Default to DateTime.
+		setField(doc, key, primitive.NewDateTimeFromTime(now))
+	default:
+		// 默认设置为日期时间
+		// EN: Default to DateTime.
+		setField(doc, key, primitive.NewDateTimeFromTime(now))
+	}
 }
 
 // getIndexManager 获取或创建索引管理器

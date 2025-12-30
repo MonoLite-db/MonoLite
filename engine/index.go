@@ -734,6 +734,9 @@ func (fm *FilterMatcher) matchOperator(docVal interface{}, operator string, oper
 	case "$elemMatch":
 		return fm.matchElemMatch(docVal, operand)
 
+	case "$mod":
+		return fm.matchMod(docVal, operand)
+
 	default:
 		// 未知运算符，当作字段名处理
 		// EN: Unknown operator; treat as field name (unsupported).
@@ -928,6 +931,46 @@ func (fm *FilterMatcher) matchElemMatch(docVal interface{}, operand interface{})
 		}
 	}
 	return false
+}
+
+// matchMod 处理 $mod 模运算
+// EN: matchMod handles $mod modulo operation.
+func (fm *FilterMatcher) matchMod(docVal interface{}, operand interface{}) bool {
+	// operand 必须是 [divisor, remainder] 格式的数组
+	// EN: operand must be an array of [divisor, remainder].
+	arr, ok := operand.(bson.A)
+	if !ok || len(arr) != 2 {
+		return false
+	}
+
+	// 获取除数和余数
+	// EN: Get divisor and remainder.
+	divisor := toFloat64(arr[0])
+	remainder := toFloat64(arr[1])
+	if divisor == 0 {
+		return false
+	}
+
+	// 文档值必须是数字类型
+	// EN: Document value must be a numeric type.
+	var docNum float64
+	switch v := docVal.(type) {
+	case int32:
+		docNum = float64(v)
+	case int64:
+		docNum = float64(v)
+	case float64:
+		docNum = v
+	case int:
+		docNum = float64(v)
+	default:
+		return false
+	}
+
+	// 计算模运算结果
+	// EN: Calculate modulo result.
+	result := int64(docNum) % int64(divisor)
+	return result == int64(remainder)
 }
 
 // compareValues 比较两个值

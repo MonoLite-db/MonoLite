@@ -240,18 +240,14 @@ func (db *Database) loadCatalog() error {
 	// EN: Get BSON document length (single-page format).
 	bsonLen := binary.LittleEndian.Uint32(data[0:4])
 	if bsonLen < 5 || int(bsonLen) > len(data) {
-		// 尝试使用旧格式加载（向后兼容）
-		// EN: Try legacy format for backward compatibility.
-		return db.loadCatalogLegacy(data)
+		return fmt.Errorf("invalid catalog: invalid BSON length %d", bsonLen)
 	}
 
 	// 反序列化 BSON 格式的 catalog
 	// EN: Unmarshal BSON-form catalog.
 	var catalog catalogData
 	if err := bson.Unmarshal(data[:bsonLen], &catalog); err != nil {
-		// 尝试使用旧格式加载
-		// EN: Try legacy format.
-		return db.loadCatalogLegacy(data)
+		return fmt.Errorf("failed to unmarshal catalog: %w", err)
 	}
 
 	return db.restoreCollectionsFromCatalog(&catalog)
@@ -353,71 +349,6 @@ func (db *Database) restoreCollectionsFromCatalog(catalog *catalogData) error {
 		// EN: If indexes exist, restore index manager.
 		if len(info.Indexes) > 0 {
 			col.restoreIndexes()
-		}
-	}
-
-	return nil
-}
-
-// loadCatalogLegacy 加载旧格式的 catalog（向后兼容）
-// EN: loadCatalogLegacy loads legacy catalog format (backward compatible).
-func (db *Database) loadCatalogLegacy(data []byte) error {
-	pos := 0
-
-	// 读取集合数量
-	// EN: Read collection count.
-	if len(data) < 4 {
-		return nil
-	}
-	count := int(binary.LittleEndian.Uint32(data[pos:]))
-	pos += 4
-
-	// 校验 count 是否合理（避免损坏数据导致无限循环）
-	// EN: Validate count to avoid infinite loops on corrupted data.
-	if count < 0 || count > 10000 {
-		return nil
-	}
-
-	for i := 0; i < count && pos < len(data); i++ {
-		// 读取集合名称长度
-		// EN: Read collection name length.
-		if pos+2 > len(data) {
-			break
-		}
-		nameLen := int(binary.LittleEndian.Uint16(data[pos:]))
-		pos += 2
-
-		// 校验名称长度
-		// EN: Validate name length.
-		if nameLen < 0 || nameLen > 1000 {
-			break
-		}
-
-		// 读取集合名称
-		// EN: Read collection name.
-		if pos+nameLen > len(data) {
-			break
-		}
-		name := string(data[pos : pos+nameLen])
-		pos += nameLen
-
-		// 读取集合元信息 (24 bytes)
-		// EN: Read collection metadata (24 bytes).
-		if pos+24 > len(data) {
-			break
-		}
-		info := &CollectionInfo{
-			Name:          name,
-			FirstPageId:   storage.PageId(binary.LittleEndian.Uint32(data[pos:])),
-			LastPageId:    storage.PageId(binary.LittleEndian.Uint32(data[pos+4:])),
-			DocumentCount: int64(binary.LittleEndian.Uint64(data[pos+8:])),
-			IndexPageId:   storage.PageId(binary.LittleEndian.Uint32(data[pos+16:])),
-		}
-		pos += 24
-
-		db.collections[name] = &Collection{
-			info: info,
-			db:   db,
 		}
 	}
 
