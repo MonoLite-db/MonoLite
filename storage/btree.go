@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"sync"
 
 	"github.com/monolite/monodb/internal/failpoint"
 )
@@ -176,6 +177,8 @@ func UnmarshalRecordId(data []byte) RecordId {
 // BTree B+Tree 索引结构
 // EN: BTree is a B+Tree index.
 type BTree struct {
+	mu sync.RWMutex
+
 	pager    *Pager
 	rootPage PageId
 	name     string
@@ -233,6 +236,8 @@ func OpenBTree(pager *Pager, rootPage PageId, name string, unique bool) *BTree {
 // RootPage 返回根页面 ID
 // EN: RootPage returns the root page ID.
 func (t *BTree) RootPage() PageId {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	return t.rootPage
 }
 
@@ -247,6 +252,9 @@ func (t *BTree) Name() string {
 // 【BUG-007 修复】对于唯一索引，在叶子节点内部进行原子检查，避免 TOCTOU
 // EN: [BUG-007 fix] For unique indexes, perform atomic checks inside the leaf node to avoid TOCTOU.
 func (t *BTree) Insert(key []byte, value []byte) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	// 【FAILPOINT】用于测试 B+Tree 插入失败场景
 	// EN: [FAILPOINT] used to test B+Tree insert failure paths.
 	if err := failpoint.Hit("btree.insert"); err != nil {
@@ -552,6 +560,9 @@ func findByteDrivenSplitPoint(node *BTreeNode) int {
 // Search 搜索键
 // EN: Search looks up a key.
 func (t *BTree) Search(key []byte) ([]byte, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
 	node, err := t.readNode(t.rootPage)
 	if err != nil {
 		return nil, err
@@ -598,6 +609,9 @@ func (t *BTree) SearchRange(minKey, maxKey []byte, includeMin, includeMax bool) 
 // limit >= 0 表示最多返回 limit 条记录
 // EN: limit >= 0 means return at most limit records.
 func (t *BTree) SearchRangeLimit(minKey, maxKey []byte, includeMin, includeMax bool, limit int) ([][]byte, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
 	results := make([][]byte, 0)
 
 	// 找到起始叶子节点
@@ -676,6 +690,9 @@ func MinKeys() int {
 // 用于分段采样验证，获取索引尾部的记录
 // EN: It is used for segmented sampling/verification to fetch records from the tail of the index.
 func (t *BTree) SearchRangeLimitReverse(limit int) ([][]byte, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
 	if limit <= 0 {
 		return nil, nil
 	}
@@ -725,6 +742,9 @@ func (t *BTree) SearchRangeLimitReverse(limit int) ([][]byte, error) {
 // 用于分段采样验证，获取索引中间位置的记录
 // EN: It is used for segmented sampling/verification to fetch records from the middle of the index.
 func (t *BTree) SearchRangeLimitSkip(skip, limit int) ([][]byte, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
 	if limit <= 0 {
 		return nil, nil
 	}
@@ -783,6 +803,9 @@ func (t *BTree) SearchRangeLimitSkip(skip, limit int) ([][]byte, error) {
 // Delete 删除键（带节点合并）
 // EN: Delete removes a key (with node merge support).
 func (t *BTree) Delete(key []byte) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	// 【FAILPOINT】用于测试 B+Tree 删除失败场景
 	// EN: [FAILPOINT] Used to test B+Tree delete failure scenarios.
 	if err := failpoint.Hit("btree.delete"); err != nil {
@@ -1356,6 +1379,9 @@ func (t *BTree) writeNode(node *BTreeNode) error {
 // Verify 校验 B+Tree 完整性
 // EN: Verify checks B+Tree integrity.
 func (t *BTree) Verify() error {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
 	// 校验树结构
 	// EN: Verify tree structure.
 	if err := t.verifyNode(t.rootPage, nil, nil, 0); err != nil {
@@ -1455,6 +1481,9 @@ func (t *BTree) verifyNode(pageId PageId, minKey, maxKey []byte, depth int) erro
 // CheckLeafChain 校验叶子节点链表（公开方法）
 // EN: CheckLeafChain verifies the leaf-node linked list (public method).
 func (t *BTree) CheckLeafChain() error {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
 	return t.verifyLeafChain()
 }
 
@@ -1534,6 +1563,9 @@ func (t *BTree) verifyLeafChain() error {
 // Count 返回 B+Tree 中的键总数
 // EN: Count returns the total number of keys in the B+Tree.
 func (t *BTree) Count() (int, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
 	count := 0
 
 	// 找到最左叶子节点
@@ -1572,6 +1604,9 @@ func (t *BTree) Count() (int, error) {
 // GetAllKeys 获取所有键（按顺序）
 // EN: GetAllKeys returns all keys in order.
 func (t *BTree) GetAllKeys() ([][]byte, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
 	keys := make([][]byte, 0)
 
 	// 找到最左叶子节点
@@ -1610,6 +1645,9 @@ func (t *BTree) GetAllKeys() ([][]byte, error) {
 // Height 返回 B+Tree 的高度
 // EN: Height returns the height of the B+Tree.
 func (t *BTree) Height() (int, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
 	height := 0
 	node, err := t.readNode(t.rootPage)
 	if err != nil {
