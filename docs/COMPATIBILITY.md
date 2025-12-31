@@ -1,8 +1,8 @@
+# MonoLite Go - MongoDB Compatibility
+
 Created by Yanjunhui
 
-## Compatibility (MongoDB)
-
-This document describes **MonoDB / MonoLite** compatibility with MongoDB (wire protocol + command semantics).
+This document describes **MonoLite** compatibility with MongoDB (wire protocol + command semantics).
 
 - **中文版本**：[`docs/COMPATIBILITY_CN.md`](COMPATIBILITY_CN.md)
 - **Back to README**：[`README.md`](../README.md)
@@ -11,7 +11,7 @@ This document describes **MonoDB / MonoLite** compatibility with MongoDB (wire p
 
 ## Scope & Goals
 
-MonoDB aims to provide **“good-enough MongoDB experience”** for local / embedded / single-node scenarios:
+MonoLite aims to provide **"good-enough MongoDB experience"** for local / embedded / single-node scenarios:
 
 - Connect with **official MongoDB drivers** and tools (`mongosh`, etc.)
 - Support the most common **CRUD + indexing + aggregation + sessions/transactions** workflows
@@ -41,42 +41,54 @@ Notes:
 
 ---
 
-## Command Compatibility (High-Level)
+## Command Compatibility
 
-MonoDB routes commands in `engine/database.go` and executes them in the engine.
+MonoLite routes commands in `engine/database.go` and executes them in the engine.
 
-### Implemented commands (server-side)
+### Implemented Commands
 
 | Command | Status | Notes |
-|--------|--------|------|
-| `ping` | ✅ | |
+|---------|--------|-------|
+| `ping` | ✅ | Connection test |
 | `hello` / `isMaster` | ✅ | Wire version + capabilities |
-| `buildInfo` | ✅ | |
-| `listCollections` | ✅ | |
+| `buildInfo` | ✅ | Server build information |
+| `serverStatus` | ✅ | Server runtime status |
+| `connectionStatus` | ✅ | Connection information |
+| `listCollections` | ✅ | List all collections |
+| `create` | ✅ | Create collection |
+| `drop` | ✅ | Drop collection |
 | `insert` | ✅ | `documents` sequence supported |
 | `find` | ✅ | Cursor + getMore supported |
-| `update` | ✅ | Basic update operators; some options may be skipped by spec runner |
-| `delete` | ✅ | **Respects per-delete `limit`** (`limit=1` → deleteOne) |
-| `count` | ✅ | |
-| `drop` | ✅ | Collection drop |
-| `createIndexes` / `listIndexes` / `dropIndexes` | ✅ | B+Tree indexes |
+| `update` | ✅ | Full update operators support |
+| `delete` | ✅ | Respects per-delete `limit` |
+| `count` | ✅ | Document counting |
+| `distinct` | ✅ | Distinct field values |
 | `aggregate` | ✅ | Pipeline subset |
-| `getMore` / `killCursors` | ✅ | Cursor management |
-| `findAndModify` | ✅ | |
-| `distinct` | ✅ | |
-| `dbStats` / `collStats` / `serverStatus` | ✅ | |
+| `findAndModify` | ✅ | Atomic find-and-modify |
+| `createIndexes` | ✅ | B+Tree indexes |
+| `listIndexes` | ✅ | List collection indexes |
+| `dropIndexes` | ✅ | Drop indexes |
+| `getMore` | ✅ | Cursor iteration |
+| `killCursors` | ✅ | Cursor cleanup |
+| `dbStats` | ✅ | Database statistics |
+| `collStats` | ✅ | Collection statistics |
 | `validate` | ✅ | Structural validation |
-| `explain` | ✅ | |
-| `connectionStatus` | ✅ | |
-| sessions / transactions (`startTransaction` / `commitTransaction` / `abortTransaction` / `endSessions` / `refreshSessions`) | ✅ | Single-node transactions |
+| `explain` | ✅ | Query plan explanation |
+| `startTransaction` | ✅ | Begin transaction |
+| `commitTransaction` | ✅ | Commit transaction |
+| `abortTransaction` | ✅ | Rollback transaction |
+| `endSessions` | ✅ | End sessions |
+| `refreshSessions` | ✅ | Refresh sessions |
 
-### Not implemented / partially implemented
+### Not Implemented
 
 | Item | Status | Notes |
-|------|--------|------|
-| `dropDatabase` | ❌ | Spec runner avoids calling it (MonoDB doesn’t implement this command yet) |
-| Command monitoring / event assertions | 🚧 | Spec runner currently skips `expectEvents` cases |
-| Full Unified Test Format support | 🚧 | Runner supports a small subset first |
+|------|--------|-------|
+| `dropDatabase` | ❌ | Not implemented |
+| `renameCollection` | ❌ | Not implemented |
+| `currentOp` | ❌ | Not implemented |
+| `killOp` | ❌ | Not implemented |
+| Command monitoring | 🚧 | Spec runner skips `expectEvents` |
 
 ---
 
@@ -84,13 +96,49 @@ MonoDB routes commands in `engine/database.go` and executes them in the engine.
 
 Filters are matched by `engine/index.go` (`FilterMatcher`) and used by both `find` and `$match`.
 
-Supported operators (current implementation):
+### Comparison Operators
 
-- **Logical**: `$and`, `$or`, `$not`, `$nor`
-- **Comparison**: `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`
-- **Array / set**: `$in`, `$nin`, `$all`, `$size`, `$elemMatch`
-- **Field**: `$exists`, `$type`
-- **Regex**: `$regex`
+| Operator | Status | Description |
+|----------|--------|-------------|
+| `$eq` | ✅ | Equal |
+| `$ne` | ✅ | Not equal |
+| `$gt` | ✅ | Greater than |
+| `$gte` | ✅ | Greater than or equal |
+| `$lt` | ✅ | Less than |
+| `$lte` | ✅ | Less than or equal |
+| `$in` | ✅ | In array |
+| `$nin` | ✅ | Not in array |
+
+### Logical Operators
+
+| Operator | Status | Description |
+|----------|--------|-------------|
+| `$and` | ✅ | Logical AND |
+| `$or` | ✅ | Logical OR |
+| `$not` | ✅ | Logical NOT |
+| `$nor` | ✅ | Logical NOR |
+
+### Element Operators
+
+| Operator | Status | Description |
+|----------|--------|-------------|
+| `$exists` | ✅ | Field exists |
+| `$type` | ✅ | BSON type check |
+
+### Array Operators
+
+| Operator | Status | Description |
+|----------|--------|-------------|
+| `$all` | ✅ | Match all elements |
+| `$size` | ✅ | Array size |
+| `$elemMatch` | ✅ | Element match |
+
+### Other Operators
+
+| Operator | Status | Description |
+|----------|--------|-------------|
+| `$regex` | ✅ | Regular expression |
+| `$mod` | ✅ | Modulo operation |
 
 Notes:
 - Dot-path field access is supported, including nested documents and array indexing.
@@ -101,20 +149,45 @@ Notes:
 
 Update operators are implemented in `engine/collection.go` (`applyUpdate`).
 
-Supported operators:
+### Field Operators
 
-- **Field**: `$set`, `$unset`, `$inc`, `$mul`, `$min`, `$max`, `$rename`
-- **Array**: `$push`, `$pop`, `$pull`, `$pullAll`, `$addToSet`
+| Operator | Status | Description |
+|----------|--------|-------------|
+| `$set` | ✅ | Set field value |
+| `$unset` | ✅ | Remove field |
+| `$inc` | ✅ | Increment value |
+| `$mul` | ✅ | Multiply value |
+| `$min` | ✅ | Set to minimum |
+| `$max` | ✅ | Set to maximum |
+| `$rename` | ✅ | Rename field |
+| `$currentDate` | ✅ | Set current date/timestamp |
+| `$setOnInsert` | ✅ | Set on insert only |
+
+### Array Operators
+
+| Operator | Status | Description |
+|----------|--------|-------------|
+| `$push` | ✅ | Add to array |
+| `$push` + `$each` | ✅ | Add multiple to array |
+| `$pop` | ✅ | Remove first/last |
+| `$pull` | ✅ | Remove matching |
+| `$pullAll` | ✅ | Remove all matching |
+| `$addToSet` | ✅ | Add unique to array |
+| `$addToSet` + `$each` | ✅ | Add multiple unique |
 
 ---
 
 ## Indexes
 
 | Item | Status | Notes |
-|------|--------|------|
+|------|--------|-------|
 | B+Tree index storage | ✅ | `storage/btree.go` |
-| Unique index | ✅ | Enforced in engine/index manager |
-| Compound keys | ✅ | Via MongoDB-like KeyString encoding |
+| Unique index | ✅ | Enforced in engine |
+| Compound keys | ✅ | MongoDB-like KeyString encoding |
+| Sparse index | ❌ | Not implemented |
+| TTL index | ❌ | Not implemented |
+| Text index | ❌ | Not implemented |
+| Geospatial index | ❌ | Not implemented |
 
 ---
 
@@ -122,38 +195,100 @@ Supported operators:
 
 Aggregation is implemented in `engine/aggregate.go`.
 
-Supported stages (subset):
+### Supported Stages
 
-- `$match`, `$project`, `$sort`, `$limit`, `$skip`
-- `$group` (common accumulators)
-- `$count`, `$unwind`
-- `$addFields` / `$set`, `$unset`
-- `$replaceRoot`
-- `$lookup` (requires DB context; supported via `Collection.Aggregate`)
+| Stage | Status | Description |
+|-------|--------|-------------|
+| `$match` | ✅ | Filter documents |
+| `$project` | ✅ | Reshape documents |
+| `$sort` | ✅ | Sort documents |
+| `$limit` | ✅ | Limit results |
+| `$skip` | ✅ | Skip documents |
+| `$group` | ✅ | Group by expression |
+| `$count` | ✅ | Count documents |
+| `$unwind` | ✅ | Deconstruct array |
+| `$addFields` / `$set` | ✅ | Add new fields |
+| `$unset` | ✅ | Remove fields |
+| `$replaceRoot` | ✅ | Replace root document |
+| `$lookup` | ✅ | Left outer join |
+
+### Group Accumulators
+
+| Accumulator | Status | Description |
+|-------------|--------|-------------|
+| `$sum` | ✅ | Sum values |
+| `$avg` | ✅ | Average value |
+| `$min` | ✅ | Minimum value |
+| `$max` | ✅ | Maximum value |
+| `$first` | ✅ | First value |
+| `$last` | ✅ | Last value |
+| `$push` | ✅ | Push to array |
+| `$addToSet` | ✅ | Add unique to array |
+
+### Not Implemented Stages
+
+| Stage | Status |
+|-------|--------|
+| `$out` | ❌ |
+| `$merge` | ❌ |
+| `$facet` | ❌ |
+| `$bucket` | ❌ |
+| `$graphLookup` | ❌ |
+| `$geoNear` | ❌ |
 
 ---
 
 ## Transactions & Sessions
 
-MonoDB provides single-node transactions and sessions:
+MonoLite provides single-node transactions and sessions:
 
-- Lock manager with deadlock detection (see tests in `engine/transaction_test.go`)
-- Session manager for standard MongoDB sessions
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Session management | ✅ | Start/end/refresh sessions |
+| Multi-document transactions | ✅ | Single-node ACID |
+| Lock manager | ✅ | Read/write locks |
+| Deadlock detection | ✅ | Wait graph analysis |
+| Transaction isolation | ✅ | Read committed |
+| Rollback on abort | ✅ | Undo log support |
 
 Limitations:
 - No replica set / distributed transactions
+- No causal consistency
+
+---
+
+## BSON Types
+
+| Type | Status | Notes |
+|------|--------|-------|
+| Double | ✅ | 64-bit float |
+| String | ✅ | UTF-8 string |
+| Document | ✅ | Embedded document |
+| Array | ✅ | BSON array |
+| Binary | ✅ | Binary data |
+| ObjectId | ✅ | 12-byte identifier |
+| Boolean | ✅ | true/false |
+| Date | ✅ | UTC datetime |
+| Null | ✅ | Null value |
+| Int32 | ✅ | 32-bit integer |
+| Int64 | ✅ | 64-bit integer |
+| Timestamp | ✅ | MongoDB timestamp |
+| Decimal128 | ❌ | Not supported |
+| MinKey/MaxKey | ❌ | Not supported |
+| JavaScript | ❌ | Not supported |
+| Regex | ✅ | Query only |
 
 ---
 
 ## Official Spec Tests (MongoDB specifications)
 
-MonoDB includes a **minimal runner** for MongoDB official CRUD Unified Test Format:
+MonoLite includes a **minimal runner** for MongoDB official CRUD Unified Test Format:
 
 - Runner: `tests/mongo_spec/crud_unified_test.go`
 - Docs: `tests/mongo_spec/README.md`
 - Test data: `third_party/mongodb/specifications/source/crud/tests/unified/`
 
-### How to run
+### How to Run
 
 By default, spec tests are skipped.
 
@@ -167,13 +302,13 @@ Run a single file:
 MONOLITE_RUN_MONGO_SPECS=1 MONOLITE_MONGO_SPECS_FILENAME=find.json go test ./tests/mongo_spec -count=1
 ```
 
-### Current runner limitations
+### Current Runner Limitations
 
-The runner intentionally skips unsupported parts to avoid false positives:
+The runner intentionally skips unsupported parts:
 
 - `expectEvents` / command monitoring assertions
 - `expectError` assertion framework
-- Many advanced options (collation/hint/let/arrayFilters/...)
+- Advanced options (collation/hint/let/arrayFilters/...)
 
 ---
 
@@ -183,7 +318,5 @@ When reporting compatibility issues, include:
 
 - Client/driver name + version
 - The exact command (Extended JSON) or code snippet
-- Expected behavior (MongoDB) vs actual behavior (MonoDB)
+- Expected behavior (MongoDB) vs actual behavior (MonoLite)
 - If possible, a reduced spec test case that reproduces the issue
-
-

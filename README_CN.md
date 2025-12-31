@@ -1,6 +1,6 @@
-# MonoDB
+# MonoLite
 
-MonoDB 是一个**单文件、可嵌入的文档数据库**，兼容 MongoDB Wire Protocol，可使用 MongoDB 官方驱动和 mongosh 直接连接。
+MonoLite 是一个**单文件、可嵌入的文档数据库**，专为 Go 设计，兼容 MongoDB Wire Protocol。纯 Go 实现，嵌入优先设计。
 
 <div align="center">
 
@@ -21,98 +21,224 @@ MonoDB 是一个**单文件、可嵌入的文档数据库**，兼容 MongoDB Wir
 - **嵌入式优先** — Library-first 设计，可直接嵌入应用
 - **兼容 MongoDB 官方驱动** — 使用熟悉的 API 和工具
 
+## 为什么选择 MonoLite？我们解决的痛点
+
+### SQLite 的困境
+
+SQLite 是一个优秀的嵌入式数据库，但当你的应用处理**文档型数据**时，会遇到这些困扰：
+
+| 痛点 | SQLite 现状 | MonoLite 方案 |
+|------|-------------|-------------|
+| **僵化的 Schema** | 必须用 `CREATE TABLE` 预定义表结构，修改需要 `ALTER TABLE` 迁移 | Schema-free — 文档可以有不同字段，自然演进 |
+| **嵌套数据** | 需要 JSON1 扩展或序列化，查询笨拙 | 原生嵌套文档，支持点号路径查询（`address.city`） |
+| **数组操作** | 无原生数组类型，需序列化或使用关联表 | 原生数组，支持 `$push`、`$pull`、`$elemMatch` 等操作符 |
+| **对象-关系阻抗不匹配** | 应用对象 ↔ 关系表需要 ORM 或手动映射 | 文档直接映射到应用对象 |
+| **查询复杂性** | 层级数据需要复杂 JOIN，SQL 冗长 | 直观的查询操作符（`$gt`、`$in`、`$or`）和聚合管道 |
+| **学习曲线** | SQL 语法各异，JOIN 逻辑复杂 | MongoDB 查询语言基于 JavaScript，广为人知 |
+
+### 何时选择 MonoLite 而非 SQLite
+
+✅ **选择 MonoLite 当：**
+- 你的数据天然是层级或文档形态（类 JSON）
+- 文档结构多变（可选字段、演进中的 Schema）
+- 你需要强大的数组操作
+- 你的团队已经熟悉 MongoDB
+- 你想用 MongoDB 兼容的方式原型开发，未来可迁移到真正的 MongoDB
+
+✅ **继续使用 SQLite 当：**
+- 你的数据高度关系化，有大量多对多关系
+- 你需要复杂的多表 JOIN
+- 你需要严格的 Schema 约束
+- 你使用现有的 SQL 工具链
+
+### MonoLite vs SQLite：功能对比
+
+| 特性 | MonoLite | SQLite |
+|------|--------|--------|
+| **数据模型** | 文档（BSON） | 关系型（表） |
+| **Schema** | 灵活，无 Schema 约束 | 固定，需要迁移 |
+| **嵌套数据** | 原生支持 | JSON1 扩展 |
+| **数组** | 原生支持，丰富操作符 | 需要序列化 |
+| **查询语言** | MongoDB 查询语言 | SQL |
+| **事务** | ✅ 多文档 ACID | ✅ ACID |
+| **索引** | B+Tree（单字段、复合、唯一） | B-Tree（多种类型） |
+| **文件格式** | 单个 `.monodb` 文件 | 单个 `.db` 文件 |
+| **崩溃恢复** | WAL | WAL/回滚日志 |
+| **成熟度** | 新项目 | 20+ 年久经考验 |
+| **生态系统** | MongoDB 驱动兼容 | 庞大的生态系统 |
+
 ## 快速开始
 
-### 安装与构建
+### 安装
 
 ```bash
-# 克隆项目
-git clone https://github.com/monolite/monodb.git
-cd monodb
-
-# 构建服务器
-go build -o monodbd ./cmd/monodbd
-
-# 构建导入/导出工具（可选）
-go build -o monodb-import ./cmd/monodb-import
-go build -o monodb-export ./cmd/monodb-export
+go get github.com/monolite/monodb
 ```
 
-### 启动服务器
+### 基本使用（库 API）
 
-```bash
-# 启动（默认端口 27017，数据文件 data.monodb）
-./monodbd
+```go
+package main
 
-# 自定义配置
-./monodbd -file mydata.monodb -addr :27018
+import (
+    "fmt"
+    "log"
+
+    "github.com/monolite/monodb/engine"
+    "go.mongodb.org/mongo-driver/bson"
+)
+
+func main() {
+    // 打开数据库
+    db, err := engine.OpenDatabase("data.monodb")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer db.Close()
+
+    // 获取集合
+    users, err := db.Collection("users")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // 插入文档
+    users.Insert(bson.D{
+        {Key: "name", Value: "Alice"},
+        {Key: "age", Value: 25},
+        {Key: "email", Value: "alice@example.com"},
+    })
+
+    // 批量插入
+    users.Insert(
+        bson.D{
+            {Key: "name", Value: "Bob"},
+            {Key: "age", Value: 30},
+            {Key: "tags", Value: bson.A{"dev", "go"}},
+        },
+        bson.D{
+            {Key: "name", Value: "Carol"},
+            {Key: "age", Value: 28},
+            {Key: "address", Value: bson.D{{Key: "city", Value: "Beijing"}}},
+        },
+    )
+
+    // 查询文档
+    results, _ := users.Find(bson.D{{Key: "age", Value: bson.D{{Key: "$gt", Value: 20}}}})
+    for _, doc := range results {
+        fmt.Println(doc)
+    }
+
+    // 查找单个文档
+    alice, _ := users.FindOne(bson.D{{Key: "name", Value: "Alice"}})
+    fmt.Println("找到:", alice)
+
+    // 点号路径查询
+    results, _ = users.Find(bson.D{{Key: "address.city", Value: "Beijing"}})
+
+    // 更新文档
+    users.Update(
+        bson.D{{Key: "name", Value: "Alice"}},
+        bson.D{{Key: "$set", Value: bson.D{{Key: "age", Value: 26}}}},
+        false, // upsert
+    )
+
+    // 带 upsert 的更新
+    users.Update(
+        bson.D{{Key: "name", Value: "Dave"}},
+        bson.D{{Key: "$set", Value: bson.D{{Key: "age", Value: 35}}}},
+        true, // upsert
+    )
+
+    // 删除文档
+    users.DeleteOne(bson.D{{Key: "name", Value: "Alice"}})
+    users.Delete(bson.D{{Key: "age", Value: bson.D{{Key: "$lt", Value: 18}}}})
+}
 ```
 
-### 使用 mongosh 连接
+### 聚合管道
 
-```bash
-mongosh mongodb://localhost:27017
+```go
+orders, _ := db.Collection("orders")
+
+pipeline := []bson.D{
+    {{Key: "$match", Value: bson.D{{Key: "status", Value: "completed"}}}},
+    {{Key: "$group", Value: bson.D{
+        {Key: "_id", Value: "$customerId"},
+        {Key: "total", Value: bson.D{{Key: "$sum", Value: "$amount"}}},
+    }}},
+    {{Key: "$sort", Value: bson.D{{Key: "total", Value: -1}}}},
+    {{Key: "$limit", Value: 10}},
+}
+
+results, _ := orders.Aggregate(pipeline)
 ```
 
-### 基本操作
+### 索引管理
 
-```javascript
-// 插入文档
-db.users.insertOne({name: "Alice", age: 25, email: "alice@example.com"})
-db.users.insertMany([
-  {name: "Bob", age: 30, tags: ["dev", "go"]},
-  {name: "Carol", age: 28, address: {city: "Beijing"}}
-])
+```go
+users, _ := db.Collection("users")
 
-// 查询文档
-db.users.find({age: {$gt: 20}})
-db.users.findOne({name: "Alice"})
-db.users.find({tags: {$in: ["dev"]}})
-db.users.find({"address.city": "Beijing"})  // 点号路径查询
+// 创建唯一索引
+users.CreateIndex(bson.D{{Key: "email", Value: 1}}, true) // unique: true
 
-// 更新文档
-db.users.updateOne({name: "Alice"}, {$set: {age: 26}})
-db.users.updateMany({}, {$inc: {age: 1}})
-db.users.updateOne({name: "Dave"}, {$set: {age: 35}}, {upsert: true})
+// 创建复合索引
+users.CreateIndex(bson.D{
+    {Key: "name", Value: 1},
+    {Key: "age", Value: -1},
+}, false)
 
-// 删除文档
-db.users.deleteOne({name: "Alice"})
-db.users.deleteMany({age: {$lt: 18}})
+// 列出索引
+indexes := users.ListIndexes()
 
-// 聚合管道
-db.orders.aggregate([
-  {$match: {status: "completed"}},
-  {$group: {_id: "$customerId", total: {$sum: "$amount"}}},
-  {$sort: {total: -1}},
-  {$limit: 10}
-])
-
-// 索引管理
-db.users.createIndex({email: 1}, {unique: true})
-db.users.createIndex({name: 1, age: -1})  // 复合索引
-db.users.getIndexes()
-db.users.dropIndex("email_1")
+// 删除索引
+users.DropIndex("email_1")
 ```
 
 ### 使用事务
 
-```javascript
-// 开启会话并启动事务
-const session = db.getMongo().startSession()
-session.startTransaction()
+```go
+// 开启会话
+session, _ := db.StartSession()
 
-try {
-  const users = session.getDatabase("test").users
-  const accounts = session.getDatabase("test").accounts
-  
-  // 转账操作
-  users.updateOne({name: "Alice"}, {$inc: {balance: -100}})
-  users.updateOne({name: "Bob"}, {$inc: {balance: 100}})
-  
-  session.commitTransaction()
-} catch (e) {
-  session.abortTransaction()
+// 启动事务
+txn, _ := session.StartTransaction()
+
+// 在事务中执行操作
+users, _ := db.Collection("users")
+
+// 转账操作
+users.Update(
+    bson.D{{Key: "name", Value: "Alice"}},
+    bson.D{{Key: "$inc", Value: bson.D{{Key: "balance", Value: -100}}}},
+    false,
+)
+users.Update(
+    bson.D{{Key: "name", Value: "Bob"}},
+    bson.D{{Key: "$inc", Value: bson.D{{Key: "balance", Value: 100}}}},
+    false,
+)
+
+// 提交或中止
+if err := txn.Commit(); err != nil {
+    txn.Abort()
 }
+```
+
+### Wire Protocol 服务器（可选）
+
+如果需要 MongoDB 驱动兼容性，可以启动 Wire Protocol 服务器：
+
+```go
+import "github.com/monolite/monodb/protocol"
+
+// 启动 MongoDB 兼容服务器
+db, _ := engine.OpenDatabase("data.monodb")
+server := protocol.NewServer(db, ":27017")
+server.Start()
+
+// 现在可以用任何 MongoDB 驱动或 mongosh 连接：
+// mongosh mongodb://localhost:27017
 ```
 
 ## 核心特性
@@ -160,15 +286,16 @@ try {
 - **serverStatus 命令** — 实时查看服务器状态
 - **内存/存储统计** — 详细的资源使用统计
 
-```javascript
+```go
 // 查看服务器状态
-db.runCommand({serverStatus: 1})
+status, _ := db.RunCommand(bson.D{{Key: "serverStatus", Value: 1}})
 
 // 查看数据库统计
-db.runCommand({dbStats: 1})
+stats, _ := db.RunCommand(bson.D{{Key: "dbStats", Value: 1}})
 
 // 查看集合统计
-db.users.stats()
+users, _ := db.Collection("users")
+colStats := users.Stats()
 ```
 
 ## 功能支持状态
@@ -327,7 +454,7 @@ mongorestore --db mydb export/
 
 > **80% MongoDB 使用体验，20% 的复杂度**
 
-MonoDB 不追求 MongoDB 全功能兼容，而是专注于以下场景：
+MonoLite 不追求 MongoDB 全功能兼容，而是专注于以下场景：
 
 - **桌面应用** — macOS / Windows / Linux 本地数据存储
 - **开发工具** — 本地调试、离线数据分析、原型验证

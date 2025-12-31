@@ -1,6 +1,6 @@
-# MonoDB
+# MonoLite
 
-MonoDB is a **single-file, embeddable document database** compatible with MongoDB Wire Protocol. Connect directly using official MongoDB drivers and mongosh.
+MonoLite is a **single-file, embeddable document database** for Go, compatible with MongoDB Wire Protocol. A pure Go implementation with embedded-first design.
 
 <div align="center">
 
@@ -21,98 +21,224 @@ MonoDB is a **single-file, embeddable document database** compatible with MongoD
 - **Embedded-First** — Library-first design, embed directly into your application
 - **MongoDB Driver Compatible** — Use familiar APIs and tools
 
+## Why MonoLite? The Pain Points We Solve
+
+### The SQLite Dilemma
+
+SQLite is an excellent embedded database, but when your application deals with **document-oriented data**, you'll encounter these frustrations:
+
+| Pain Point | SQLite Reality | MonoLite Solution |
+|------------|----------------|-----------------|
+| **Rigid Schema** | Must define tables upfront with `CREATE TABLE`, schema changes require `ALTER TABLE` migrations | Schema-free — documents can have different fields, evolve naturally |
+| **Nested Data** | Requires JSON1 extension or serialization, clunky to query | Native nested documents with dot notation (`address.city`) |
+| **Array Operations** | No native array type, must serialize or use junction tables | Native arrays with operators like `$push`, `$pull`, `$elemMatch` |
+| **Object-Relational Mismatch** | Application objects ↔ relational tables require ORM or manual mapping | Documents map directly to application objects |
+| **Query Complexity** | Complex JOINs for hierarchical data, verbose SQL | Intuitive query operators (`$gt`, `$in`, `$or`) and aggregation pipelines |
+| **Learning Curve** | SQL syntax varies, JOIN logic can be complex | MongoDB query language is JavaScript-native and widely known |
+
+### When to Choose MonoLite over SQLite
+
+✅ **Choose MonoLite when:**
+- Your data is naturally hierarchical or document-shaped (JSON-like)
+- Documents have varying structures (optional fields, evolving schemas)
+- You need powerful array operations
+- Your team already knows MongoDB
+- You want to prototype with MongoDB compatibility, then scale to real MongoDB later
+
+✅ **Stick with SQLite when:**
+- Your data is highly relational with many-to-many relationships
+- You need complex multi-table JOINs
+- You require strict schema enforcement
+- You're working with existing SQL-based tooling
+
+### MonoLite vs SQLite: Feature Comparison
+
+| Feature | MonoLite | SQLite |
+|---------|--------|--------|
+| **Data Model** | Document (BSON) | Relational (Tables) |
+| **Schema** | Flexible, schema-free | Fixed, requires migrations |
+| **Nested Data** | Native support | JSON1 extension |
+| **Arrays** | Native with operators | Serialization required |
+| **Query Language** | MongoDB Query Language | SQL |
+| **Transactions** | ✅ Multi-document ACID | ✅ ACID |
+| **Indexes** | B+Tree (single, compound, unique) | B-Tree (various types) |
+| **File Format** | Single `.monodb` file | Single `.db` file |
+| **Crash Recovery** | WAL | WAL/Rollback Journal |
+| **Maturity** | New | 20+ years battle-tested |
+| **Ecosystem** | MongoDB driver compatible | Massive ecosystem |
+
 ## Quick Start
 
-### Installation & Build
+### Installation
 
 ```bash
-# Clone the project
-git clone https://github.com/monolite/monodb.git
-cd monodb
-
-# Build the server
-go build -o monodbd ./cmd/monodbd
-
-# Build import/export tools (optional)
-go build -o monodb-import ./cmd/monodb-import
-go build -o monodb-export ./cmd/monodb-export
+go get github.com/monolite/monodb
 ```
 
-### Start the Server
+### Basic Usage (Library API)
 
-```bash
-# Start (default port 27017, data file data.monodb)
-./monodbd
+```go
+package main
 
-# Custom configuration
-./monodbd -file mydata.monodb -addr :27018
+import (
+    "fmt"
+    "log"
+
+    "github.com/monolite/monodb/engine"
+    "go.mongodb.org/mongo-driver/bson"
+)
+
+func main() {
+    // Open database
+    db, err := engine.OpenDatabase("data.monodb")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer db.Close()
+
+    // Get collection
+    users, err := db.Collection("users")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Insert documents
+    users.Insert(bson.D{
+        {Key: "name", Value: "Alice"},
+        {Key: "age", Value: 25},
+        {Key: "email", Value: "alice@example.com"},
+    })
+
+    // Insert multiple documents
+    users.Insert(
+        bson.D{
+            {Key: "name", Value: "Bob"},
+            {Key: "age", Value: 30},
+            {Key: "tags", Value: bson.A{"dev", "go"}},
+        },
+        bson.D{
+            {Key: "name", Value: "Carol"},
+            {Key: "age", Value: 28},
+            {Key: "address", Value: bson.D{{Key: "city", Value: "Beijing"}}},
+        },
+    )
+
+    // Query documents
+    results, _ := users.Find(bson.D{{Key: "age", Value: bson.D{{Key: "$gt", Value: 20}}}})
+    for _, doc := range results {
+        fmt.Println(doc)
+    }
+
+    // Find one document
+    alice, _ := users.FindOne(bson.D{{Key: "name", Value: "Alice"}})
+    fmt.Println("Found:", alice)
+
+    // Query with dot notation
+    results, _ = users.Find(bson.D{{Key: "address.city", Value: "Beijing"}})
+
+    // Update documents
+    users.Update(
+        bson.D{{Key: "name", Value: "Alice"}},
+        bson.D{{Key: "$set", Value: bson.D{{Key: "age", Value: 26}}}},
+        false, // upsert
+    )
+
+    // Update with upsert
+    users.Update(
+        bson.D{{Key: "name", Value: "Dave"}},
+        bson.D{{Key: "$set", Value: bson.D{{Key: "age", Value: 35}}}},
+        true, // upsert
+    )
+
+    // Delete documents
+    users.DeleteOne(bson.D{{Key: "name", Value: "Alice"}})
+    users.Delete(bson.D{{Key: "age", Value: bson.D{{Key: "$lt", Value: 18}}}})
+}
 ```
 
-### Connect with mongosh
+### Aggregation Pipeline
 
-```bash
-mongosh mongodb://localhost:27017
+```go
+orders, _ := db.Collection("orders")
+
+pipeline := []bson.D{
+    {{Key: "$match", Value: bson.D{{Key: "status", Value: "completed"}}}},
+    {{Key: "$group", Value: bson.D{
+        {Key: "_id", Value: "$customerId"},
+        {Key: "total", Value: bson.D{{Key: "$sum", Value: "$amount"}}},
+    }}},
+    {{Key: "$sort", Value: bson.D{{Key: "total", Value: -1}}}},
+    {{Key: "$limit", Value: 10}},
+}
+
+results, _ := orders.Aggregate(pipeline)
 ```
 
-### Basic Operations
+### Index Management
 
-```javascript
-// Insert documents
-db.users.insertOne({name: "Alice", age: 25, email: "alice@example.com"})
-db.users.insertMany([
-  {name: "Bob", age: 30, tags: ["dev", "go"]},
-  {name: "Carol", age: 28, address: {city: "Beijing"}}
-])
+```go
+users, _ := db.Collection("users")
 
-// Query documents
-db.users.find({age: {$gt: 20}})
-db.users.findOne({name: "Alice"})
-db.users.find({tags: {$in: ["dev"]}})
-db.users.find({"address.city": "Beijing"})  // Dot notation query
+// Create unique index
+users.CreateIndex(bson.D{{Key: "email", Value: 1}}, true) // unique: true
 
-// Update documents
-db.users.updateOne({name: "Alice"}, {$set: {age: 26}})
-db.users.updateMany({}, {$inc: {age: 1}})
-db.users.updateOne({name: "Dave"}, {$set: {age: 35}}, {upsert: true})
+// Create compound index
+users.CreateIndex(bson.D{
+    {Key: "name", Value: 1},
+    {Key: "age", Value: -1},
+}, false)
 
-// Delete documents
-db.users.deleteOne({name: "Alice"})
-db.users.deleteMany({age: {$lt: 18}})
+// List indexes
+indexes := users.ListIndexes()
 
-// Aggregation pipeline
-db.orders.aggregate([
-  {$match: {status: "completed"}},
-  {$group: {_id: "$customerId", total: {$sum: "$amount"}}},
-  {$sort: {total: -1}},
-  {$limit: 10}
-])
-
-// Index management
-db.users.createIndex({email: 1}, {unique: true})
-db.users.createIndex({name: 1, age: -1})  // Compound index
-db.users.getIndexes()
-db.users.dropIndex("email_1")
+// Drop index
+users.DropIndex("email_1")
 ```
 
 ### Using Transactions
 
-```javascript
-// Start a session and begin a transaction
-const session = db.getMongo().startSession()
-session.startTransaction()
+```go
+// Start a session
+session, _ := db.StartSession()
 
-try {
-  const users = session.getDatabase("test").users
-  const accounts = session.getDatabase("test").accounts
-  
-  // Transfer operation
-  users.updateOne({name: "Alice"}, {$inc: {balance: -100}})
-  users.updateOne({name: "Bob"}, {$inc: {balance: 100}})
-  
-  session.commitTransaction()
-} catch (e) {
-  session.abortTransaction()
+// Start transaction
+txn, _ := session.StartTransaction()
+
+// Perform operations within transaction
+users, _ := db.Collection("users")
+
+// Transfer operation
+users.Update(
+    bson.D{{Key: "name", Value: "Alice"}},
+    bson.D{{Key: "$inc", Value: bson.D{{Key: "balance", Value: -100}}}},
+    false,
+)
+users.Update(
+    bson.D{{Key: "name", Value: "Bob"}},
+    bson.D{{Key: "$inc", Value: bson.D{{Key: "balance", Value: 100}}}},
+    false,
+)
+
+// Commit or abort
+if err := txn.Commit(); err != nil {
+    txn.Abort()
 }
+```
+
+### Wire Protocol Server (Optional)
+
+If you need MongoDB driver compatibility, you can start the Wire Protocol server:
+
+```go
+import "github.com/monolite/monodb/protocol"
+
+// Start MongoDB-compatible server
+db, _ := engine.OpenDatabase("data.monodb")
+server := protocol.NewServer(db, ":27017")
+server.Start()
+
+// Now connect with any MongoDB driver or mongosh:
+// mongosh mongodb://localhost:27017
 ```
 
 ## Core Features
@@ -160,15 +286,16 @@ try {
 - **serverStatus Command** — Real-time server status monitoring
 - **Memory/Storage Statistics** — Detailed resource usage statistics
 
-```javascript
+```go
 // View server status
-db.runCommand({serverStatus: 1})
+status, _ := db.RunCommand(bson.D{{Key: "serverStatus", Value: 1}})
 
 // View database statistics
-db.runCommand({dbStats: 1})
+stats, _ := db.RunCommand(bson.D{{Key: "dbStats", Value: 1}})
 
 // View collection statistics
-db.users.stats()
+users, _ := db.Collection("users")
+colStats := users.Stats()
 ```
 
 ## Feature Support Status
@@ -328,7 +455,7 @@ mongorestore --db mydb export/
 
 > **80% of MongoDB experience, 20% of the complexity**
 
-MonoDB doesn't aim for full MongoDB compatibility, but focuses on these scenarios:
+MonoLite doesn't aim for full MongoDB compatibility, but focuses on these scenarios:
 
 - **Desktop Applications** — Local data storage for macOS / Windows / Linux
 - **Development Tools** — Local debugging, offline data analysis, prototype validation
